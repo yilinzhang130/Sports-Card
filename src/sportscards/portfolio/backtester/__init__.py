@@ -1,4 +1,5 @@
 """Backtester implementations. ``walk_forward`` is the default."""
+
 from sportscards.portfolio.backtester.walk_forward import (
     BacktestConfig,
     BacktestResult,

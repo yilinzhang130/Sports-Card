@@ -6,6 +6,7 @@ driven by trailing dollar-volume and price stability in (player, set, grade)
 buckets. The research doc (SCAA Substack section, lines 142–147 of
 ``compass_artifact...md``) anchors the 70% sleeve to this PWCC-100 cohort.
 """
+
 from __future__ import annotations
 
 import warnings

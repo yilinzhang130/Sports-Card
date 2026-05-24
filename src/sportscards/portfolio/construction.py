@@ -9,6 +9,7 @@ If Phase 2B (``factor_df``) or Phase 3 (``prospect_df``) inputs are missing,
 the missing sleeve's target weight is redistributed pro-rata to the
 remaining sleeves and a ``UserWarning`` is emitted.
 """
+
 from __future__ import annotations
 
 import warnings
@@ -156,8 +157,14 @@ def build_portfolio(
             stacklevel=2,
         )
         # redistribute missing weight pro-rata to anchor (only present sleeve guaranteed)
-        unallocated = cfg.anchor_weight + cfg.factor_weight + cfg.prospect_weight \
-            - anchor_w - factor_w - prospect_w
+        unallocated = (
+            cfg.anchor_weight
+            + cfg.factor_weight
+            + cfg.prospect_weight
+            - anchor_w
+            - factor_w
+            - prospect_w
+        )
         anchor_w += unallocated
 
     aum = cfg.total_aum_usd

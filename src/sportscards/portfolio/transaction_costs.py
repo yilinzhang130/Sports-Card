@@ -4,6 +4,7 @@ Rates default to the research-doc snapshot (eBay 13.25% + $0.30 per sale,
 Goldin/Heritage 20% buyer's premium, PSA Value Bulk $24.99 effective Feb 2026).
 All rates are configurable via :class:`FeeSchedule` because fees shift.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

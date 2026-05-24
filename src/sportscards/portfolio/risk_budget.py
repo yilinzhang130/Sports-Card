@@ -1,4 +1,5 @@
 """Risk reporting: position caps, concentration (Herfindahl), beta to index."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -26,8 +27,14 @@ def position_size_violations(
 ) -> list[Violation]:
     out: list[Violation] = []
     for p in positions:
-        cap = cfg.anchor_position_cap_pct if p.sleeve == "anchor" else (
-            cfg.prospect_per_name_cap_pct if p.sleeve == "prospect" else cfg.other_position_cap_pct
+        cap = (
+            cfg.anchor_position_cap_pct
+            if p.sleeve == "anchor"
+            else (
+                cfg.prospect_per_name_cap_pct
+                if p.sleeve == "prospect"
+                else cfg.other_position_cap_pct
+            )
         )
         if abs(p.target_weight_pct) > cap + 1e-9:
             out.append(Violation(p.card_id, p.sleeve, p.target_weight_pct, cap))

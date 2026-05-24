@@ -1,4 +1,5 @@
 """Tests for portfolio construction, transaction costs, and risk budget."""
+
 from __future__ import annotations
 
 import warnings
@@ -26,6 +27,7 @@ from sportscards.portfolio.transaction_costs import (
 )
 
 # ---- transaction costs ----
+
 
 def test_ebay_net_proceeds() -> None:
     # 100 - 13.25 - 0.30 = 86.45
@@ -61,19 +63,24 @@ def test_custom_schedule_overrides_default() -> None:
 
 # ---- portfolio construction ----
 
+
 def _make_universe(n_anchors: int = 5, n_factor: int = 10, n_prospect: int = 5):
     anchors = pd.DataFrame({"card_id": list(range(100, 100 + n_anchors)), "last_price": 1000.0})
-    factor = pd.DataFrame({
-        "card_id": list(range(200, 200 + n_factor)),
-        "mispricing_residual": [(-1) ** i * (i + 1) * 0.05 for i in range(n_factor)],
-        "parallel_tier": ["base"] * n_factor,
-        "sport": ["NBA"] * n_factor,
-    })
-    prospect = pd.DataFrame({
-        "card_id": list(range(300, 300 + n_prospect)),
-        "stardom_score": [10 - i for i in range(n_prospect)],
-        "last_price": 200.0,
-    })
+    factor = pd.DataFrame(
+        {
+            "card_id": list(range(200, 200 + n_factor)),
+            "mispricing_residual": [(-1) ** i * (i + 1) * 0.05 for i in range(n_factor)],
+            "parallel_tier": ["base"] * n_factor,
+            "sport": ["NBA"] * n_factor,
+        }
+    )
+    prospect = pd.DataFrame(
+        {
+            "card_id": list(range(300, 300 + n_prospect)),
+            "stardom_score": [10 - i for i in range(n_prospect)],
+            "last_price": 200.0,
+        }
+    )
     return UniverseSnapshot(anchors_df=anchors, factor_df=factor, prospect_df=prospect)
 
 
@@ -141,6 +148,7 @@ def test_factor_long_only_when_short_decile_none() -> None:
 
 # ---- risk budget ----
 
+
 def test_position_size_violations_empty_under_caps() -> None:
     universe = _make_universe()
     cfg = AllocationConfig()
@@ -163,8 +171,10 @@ def test_herfindahl_concentrated_when_single_card() -> None:
 def test_concentration_by_player() -> None:
     universe = _make_universe()
     positions = build_portfolio(universe, AllocationConfig())
-    meta = {p.card_id: {"player": "Jordan" if i % 2 == 0 else "Kobe", "year": 1996}
-            for i, p in enumerate(positions)}
+    meta = {
+        p.card_id: {"player": "Jordan" if i % 2 == 0 else "Kobe", "year": 1996}
+        for i, p in enumerate(positions)
+    }
     hhi = concentration(positions, "player", meta)
     assert sum(hhi.values()) <= 1.0 + 1e-9
     assert set(hhi.keys()).issubset({"Jordan", "Kobe", "unknown"})

@@ -4,6 +4,7 @@ Used for unit-testing the repeat-sales estimator before real eBay data is
 flowing. Produces a (tx_clean-shaped) DataFrame together with the ground-truth
 latent weekly index that was used to generate prices.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -63,13 +64,15 @@ def generate_synthetic_tx(
             day_offset = int(rng.integers(0, 7))
             sold_at = week_starts[w] + pd.Timedelta(days=day_offset)
             price = cert_level * index[w] * float(np.exp(rng.normal(0, noise_sigma)))
-            rows.append({
-                "cert_number": f"C{c:05d}",
-                "sold_at": sold_at,
-                "price_usd": float(price),
-                "slab_grader": "PSA",
-                "slab_grade": 10.0,
-            })
+            rows.append(
+                {
+                    "cert_number": f"C{c:05d}",
+                    "sold_at": sold_at,
+                    "price_usd": float(price),
+                    "slab_grader": "PSA",
+                    "slab_grade": 10.0,
+                }
+            )
 
     tx = pd.DataFrame(rows)
     return tx, truth

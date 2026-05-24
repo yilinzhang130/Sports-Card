@@ -4,6 +4,7 @@ Each loader returns ``None`` when the upstream table is missing/empty so
 that downstream code degrades gracefully — anchor-only portfolio and
 backtests still run when Phase 2B / Phase 3 aren't merged yet.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -59,13 +60,17 @@ def load_mispricing(session: Any, as_of: datetime) -> pd.DataFrame | None:
         return None
     from sqlalchemy import text
 
-    rows = session.execute(
-        text(
-            "SELECT card_id, mispricing_residual, computed_at, sport, parallel_tier "
-            "FROM tx_mispricing WHERE computed_at < :as_of"
-        ),
-        {"as_of": as_of},
-    ).mappings().all()
+    rows = (
+        session.execute(
+            text(
+                "SELECT card_id, mispricing_residual, computed_at, sport, parallel_tier "
+                "FROM tx_mispricing WHERE computed_at < :as_of"
+            ),
+            {"as_of": as_of},
+        )
+        .mappings()
+        .all()
+    )
     if not rows:
         return None
     df = pd.DataFrame(rows)
@@ -86,15 +91,19 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
         return None
     from sqlalchemy import text
 
-    rows = session.execute(
-        text(
-            "SELECT c.card_id, s.premium AS stardom_score, s.fit_at AS computed_at "
-            "FROM player_stardom_score s "
-            "JOIN card_master c ON c.player_id = s.player_id "
-            "WHERE s.fit_at < :as_of AND c.is_rookie = true"
-        ),
-        {"as_of": as_of},
-    ).mappings().all()
+    rows = (
+        session.execute(
+            text(
+                "SELECT c.card_id, s.premium AS stardom_score, s.fit_at AS computed_at "
+                "FROM player_stardom_score s "
+                "JOIN card_master c ON c.player_id = s.player_id "
+                "WHERE s.fit_at < :as_of AND c.is_rookie = true"
+            ),
+            {"as_of": as_of},
+        )
+        .mappings()
+        .all()
+    )
     if not rows:
         return None
     df = pd.DataFrame(rows)

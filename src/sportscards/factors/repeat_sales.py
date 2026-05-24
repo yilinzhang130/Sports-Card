@@ -14,6 +14,7 @@ the first period with sufficient pair coverage equals 100.
 # variance to handle heteroskedasticity from longer holding periods. Implement
 # once the simple variant is stable in production.
 """
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -84,21 +85,23 @@ def build_pairs(
     b = df["bucket"].to_numpy()
 
     # Form (i, i+1) pairs only when both rows share the same cert.
-    is_pair = (cert[:-1] == cert[1:])
+    is_pair = cert[:-1] == cert[1:]
     if not is_pair.any():
         return _empty_pairs()
 
     idx0 = np.where(is_pair)[0]
     idx1 = idx0 + 1
-    pairs = pd.DataFrame({
-        "cert_number": cert[idx0],
-        "t0": sold_at[idx0],
-        "t1": sold_at[idx1],
-        "bucket0": b[idx0],
-        "bucket1": b[idx1],
-        "price0": price[idx0],
-        "price1": price[idx1],
-    })
+    pairs = pd.DataFrame(
+        {
+            "cert_number": cert[idx0],
+            "t0": sold_at[idx0],
+            "t1": sold_at[idx1],
+            "bucket0": b[idx0],
+            "bucket1": b[idx1],
+            "price0": price[idx0],
+            "price1": price[idx1],
+        }
+    )
     # Drop pairs in the same bucket (Δt = 0 in regression time).
     pairs = pairs[pairs["bucket0"] != pairs["bucket1"]]
     pairs = pairs[(pairs["price0"] > 0) & (pairs["price1"] > 0)]
@@ -120,16 +123,18 @@ def build_pairs(
 
 
 def _empty_pairs() -> pd.DataFrame:
-    return pd.DataFrame({
-        "cert_number": pd.Series(dtype=object),
-        "t0": pd.Series(dtype="datetime64[ns, UTC]"),
-        "t1": pd.Series(dtype="datetime64[ns, UTC]"),
-        "bucket0": pd.Series(dtype="datetime64[ns, UTC]"),
-        "bucket1": pd.Series(dtype="datetime64[ns, UTC]"),
-        "price0": pd.Series(dtype=float),
-        "price1": pd.Series(dtype=float),
-        "log_return": pd.Series(dtype=float),
-    })
+    return pd.DataFrame(
+        {
+            "cert_number": pd.Series(dtype=object),
+            "t0": pd.Series(dtype="datetime64[ns, UTC]"),
+            "t1": pd.Series(dtype="datetime64[ns, UTC]"),
+            "bucket0": pd.Series(dtype="datetime64[ns, UTC]"),
+            "bucket1": pd.Series(dtype="datetime64[ns, UTC]"),
+            "price0": pd.Series(dtype=float),
+            "price1": pd.Series(dtype=float),
+            "log_return": pd.Series(dtype=float),
+        }
+    )
 
 
 def estimate_index(
@@ -147,15 +152,13 @@ def estimate_index(
     filtered = _filter_grade(tx, grade_tier)
     pairs = build_pairs(filtered, bucket=bucket, outlier_sigma=outlier_sigma)
     if pairs.empty:
-        return pd.DataFrame(
-            columns=["period_start", "index_value", "n_pairs", "se"]
-        )
+        return pd.DataFrame(columns=["period_start", "index_value", "n_pairs", "se"])
 
     # Build the integer time-bucket axis over the full observed range so that
     # downstream joins (truth, CL50) line up even on empty periods.
-    periods = pd.DatetimeIndex(sorted(
-        set(pairs["bucket0"]).union(set(pairs["bucket1"]))
-    )).sort_values()
+    periods = pd.DatetimeIndex(
+        sorted(set(pairs["bucket0"]).union(set(pairs["bucket1"])))
+    ).sort_values()
     # Densify to a regular grid so consumers get a continuous time series.
     if bucket == "weekly":
         full = pd.date_range(periods.min(), periods.max(), freq="7D", tz="UTC")
@@ -204,12 +207,14 @@ def estimate_index(
     levels = np.where(unident, np.nan, levels)
     se = np.where(unident, np.nan, se)
 
-    return pd.DataFrame({
-        "period_start": full,
-        "index_value": levels,
-        "n_pairs": counts,
-        "se": se,
-    })
+    return pd.DataFrame(
+        {
+            "period_start": full,
+            "index_value": levels,
+            "n_pairs": counts,
+            "se": se,
+        }
+    )
 
 
 def _safe_se(X: np.ndarray, sigma2: float) -> np.ndarray:

@@ -14,6 +14,7 @@ Design choices (per Phase 4 spec):
 The backtester accepts callables (``get_universe``, ``price_panel``) so
 tests can inject synthetic data without a database.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -117,7 +118,7 @@ def run_backtest(
     if not panel_idx.empty:
         panel_idx["date"] = pd.to_datetime(panel_idx["date"])
 
-    holdings: dict[int, float] = {}      # card_id -> units
+    holdings: dict[int, float] = {}  # card_id -> units
     cash = cfg.initial_aum_usd
     target_units: dict[int, float] = {}
     nav_series: list[float] = []
@@ -132,8 +133,7 @@ def run_backtest(
         # Mark NAV
         prices_today = prices_wide.loc[d] if d in prices_wide.index else pd.Series(dtype=float)
         portfolio_value = cash + sum(
-            units * float(prices_today.get(cid, 0.0) or 0.0)
-            for cid, units in holdings.items()
+            units * float(prices_today.get(cid, 0.0) or 0.0) for cid, units in holdings.items()
         )
 
         # Rebalance: compute new targets using info < d
@@ -142,8 +142,12 @@ def run_backtest(
             positions = build_portfolio(universe, cfg.allocation)
             for p in positions:
                 weights_records.append(
-                    {"date": d, "card_id": p.card_id, "sleeve": p.sleeve,
-                     "weight_pct": p.target_weight_pct}
+                    {
+                        "date": d,
+                        "card_id": p.card_id,
+                        "sleeve": p.sleeve,
+                        "weight_pct": p.target_weight_pct,
+                    }
                 )
             aum_for_targets = portfolio_value
             target_units = _target_units(positions, prices_today, aum_for_targets)
@@ -176,8 +180,13 @@ def run_backtest(
                     holdings[cid] = cur + trade_units
                     fees_today += cost - trade_units * px
                     trade_records.append(
-                        {"date": d, "card_id": cid, "units": trade_units,
-                         "price": px, "fees": cost - trade_units * px}
+                        {
+                            "date": d,
+                            "card_id": cid,
+                            "units": trade_units,
+                            "price": px,
+                            "fees": cost - trade_units * px,
+                        }
                     )
                 elif trade_units < 0:
                     sell_units = -trade_units
@@ -188,16 +197,20 @@ def run_backtest(
                     holdings[cid] = cur + trade_units
                     fees_today += sell_units * px - proceeds
                     trade_records.append(
-                        {"date": d, "card_id": cid, "units": trade_units,
-                         "price": px, "fees": sell_units * px - proceeds}
+                        {
+                            "date": d,
+                            "card_id": cid,
+                            "units": trade_units,
+                            "price": px,
+                            "fees": sell_units * px - proceeds,
+                        }
                     )
             next_trade_window = d + pd.Timedelta(days=7)
 
         # Re-mark after trades
         prices_today = prices_wide.loc[d] if d in prices_wide.index else pd.Series(dtype=float)
         portfolio_value = cash + sum(
-            units * float(prices_today.get(cid, 0.0) or 0.0)
-            for cid, units in holdings.items()
+            units * float(prices_today.get(cid, 0.0) or 0.0) for cid, units in holdings.items()
         )
         nav_series.append(portfolio_value)
         fees_series.append(fees_today)
@@ -239,8 +252,9 @@ def run_backtest(
     )
 
 
-def synthetic_flat_panel(card_ids: list[int], start: date, end: date, price: float = 100.0,
-                        daily_volume: int = 10) -> pd.DataFrame:
+def synthetic_flat_panel(
+    card_ids: list[int], start: date, end: date, price: float = 100.0, daily_volume: int = 10
+) -> pd.DataFrame:
     """Helper for tests: flat-price daily panel with constant volume per card."""
     dates = pd.date_range(start, end, freq="D")
     rows = [

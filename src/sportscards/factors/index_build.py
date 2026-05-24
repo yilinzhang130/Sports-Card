@@ -3,6 +3,7 @@
 Also exposes a synthetic-data seeder so the full pipeline can be exercised
 end-to-end before real eBay data is flowing.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -48,8 +49,7 @@ def _load_tx(sport: str, era: str) -> pd.DataFrame:
 
     if not rows:
         return pd.DataFrame(
-            columns=["cert_number", "sold_at", "price_usd",
-                     "slab_grader", "slab_grade", "year"]
+            columns=["cert_number", "sold_at", "price_usd", "slab_grader", "slab_grade", "year"]
         )
     return pd.DataFrame(
         [
@@ -83,7 +83,11 @@ def _upsert(rows: list[dict], replace_key: dict | None = None) -> int:
         }
         stmt = stmt.on_conflict_do_update(
             index_elements=[
-                "period_start", "sport", "bucket", "grade_tier", "era",
+                "period_start",
+                "sport",
+                "bucket",
+                "grade_tier",
+                "era",
             ],
             set_=update_cols,
         )
@@ -121,19 +125,17 @@ def build_and_persist(
                     "grade_tier": tier,
                     "era": era,
                     "index_value": (
-                        None if pd.isna(row.index_value)
-                        else Decimal(f"{row.index_value:.4f}")
+                        None if pd.isna(row.index_value) else Decimal(f"{row.index_value:.4f}")
                     ),
                     "n_pairs": int(row.n_pairs),
-                    "se": (
-                        None if pd.isna(row.se) else Decimal(f"{row.se:.5f}")
-                    ),
+                    "se": (None if pd.isna(row.se) else Decimal(f"{row.se:.5f}")),
                 }
                 for row in idx.itertuples(index=False)
             ]
             replace_key = (
                 {"sport": sport, "bucket": bucket, "grade_tier": tier, "era": era}
-                if replace else None
+                if replace
+                else None
             )
             n = _upsert(rows, replace_key=replace_key)
             stats[f"{sport}/{era}/{tier}/{bucket}"] = n
