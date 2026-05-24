@@ -18,7 +18,18 @@ dependencies = [
     "pyyaml>=6.0",
     "click>=8.1",
     "pandas>=2.2",
+    "numpy>=2.0",
     "rich>=13.8",
+    "catboost>=1.2",
+    "pyarrow>=17.0",
+]
+
+[project.optional-dependencies]
+scouting-live = [
+    # Pulled only for the live NBA ingest path. The library is known to break
+    # when Basketball-Reference's HTML changes; tests inject a fake client so
+    # the test suite does not require this dep.
+    "basketball-reference-scraper>=1.0.6",
 ]
 
 [project.scripts]
@@ -38,6 +49,8 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
     "types-pyyaml",
+    "pre-commit>=3.8",
+    "pandas-stubs",
 ]
 
 [tool.ruff]
@@ -51,6 +64,26 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+# click/prefect/tenacity decorators aren't typed; scope the relaxation to the
+# modules that actually use them so the rest of the tree stays strict.
+[[tool.mypy.overrides]]
+module = [
+    "sportscards.cli.*",
+    "sportscards.flows.*",
+    "sportscards.ingest.*",
+    "sportscards.scouting.*",
+]
+disallow_untyped_decorators = false
+
+# Third-party libs without type stubs.
+[[tool.mypy.overrides]]
+module = ["catboost.*", "basketball_reference_scraper.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -75,24 +75,43 @@ def load_mispricing(session: Any, as_of: datetime) -> pd.DataFrame | None:
 
 
 def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
-    """Phase 3 output. Returns None if the table isn't there yet.
+    """Phase 3 output (``player_stardom_score``). Returns None if absent.
 
-    Expected schema: ``card_id, stardom_score, computed_at, last_price``.
+    Joins ``player_stardom_score`` to ``card_master`` so the prospect sleeve
+    can be expressed in card_id units. Stardom is keyed by (player_id,
+    model_version); we pick each player's latest ``fit_at`` < as_of and
+    expand to their rookie cards.
     """
-    if not _has_table(session, "player_stardom"):
+    if not _has_table(session, "player_stardom_score"):
         return None
     from sqlalchemy import text
 
     rows = session.execute(
         text(
-            "SELECT card_id, stardom_score, computed_at, last_price "
-            "FROM player_stardom WHERE computed_at < :as_of"
+            "SELECT c.card_id, s.premium AS stardom_score, s.fit_at AS computed_at "
+            "FROM player_stardom_score s "
+            "JOIN card_master c ON c.player_id = s.player_id "
+            "WHERE s.fit_at < :as_of AND c.is_rookie = true"
         ),
         {"as_of": as_of},
     ).mappings().all()
     if not rows:
         return None
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    # Attach last_price from tx_clean for sizing
+    from sqlalchemy import func
+
+    from sportscards.db.models import TxClean
+
+    price_rows = session.execute(
+        select(TxClean.card_id, func.avg(TxClean.price_usd).label("last_price"))
+        .where(TxClean.card_id.in_(df["card_id"].tolist()))
+        .where(TxClean.sold_at < as_of)
+        .group_by(TxClean.card_id)
+    ).all()
+    price_map = {r.card_id: float(r.last_price) for r in price_rows}
+    df["last_price"] = df["card_id"].map(price_map)
+    return df
 
 
 def load_price_panel(

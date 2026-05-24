@@ -1,4 +1,5 @@
 """sportscards CLI."""
+
 from __future__ import annotations
 
 import logging
@@ -72,7 +73,9 @@ def auction() -> None:
 
 @auction.command("import")
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--house", required=True, type=click.Choice(["goldin", "heritage", "fanatics_collect"]))
+@click.option(
+    "--house", required=True, type=click.Choice(["goldin", "heritage", "fanatics_collect"])
+)
 def auction_import_cmd(path: str, house: str) -> None:
     from sportscards.ingest.auction_import import import_auction_csv
 
@@ -130,9 +133,15 @@ def psa_template_cmd() -> None:
     with session_scope() as s:
         rows = s.execute(
             select(
-                Card.card_id, Card.year, Card.set_name, Card.parallel,
-                Card.card_number, Player.name,
-            ).join(Player).order_by(Card.year.desc(), Card.set_name)
+                Card.card_id,
+                Card.year,
+                Card.set_name,
+                Card.parallel,
+                Card.card_number,
+                Player.name,
+            )
+            .join(Player)
+            .order_by(Card.year.desc(), Card.set_name)
         ).all()
 
     click.echo("# Daily PSA pop snapshot priority queue.")
@@ -140,7 +149,7 @@ def psa_template_cmd() -> None:
     click.echo("# Then pull SpecID from the response.")
     for r in rows:
         comment = f"{r.year} {r.set_name} {r.parallel} #{r.card_number} {r.name}"
-        click.echo(f"- {{card_id: {r.card_id}, psa_spec_id: \"TBD\"}}  # {comment}")
+        click.echo(f'- {{card_id: {r.card_id}, psa_spec_id: "TBD"}}  # {comment}')
 
 
 @psa.command("map")
@@ -287,6 +296,140 @@ def backtest_run_cmd(start: str, end: str, aum: float, out: str | None) -> None:
     md_path.write_text(md)
     click.echo(f"wrote {json_path} and {md_path}")
     click.echo(json.dumps(summary_json, indent=2, default=str))
+@cli.command("deploy")
+def deploy_cmd() -> None:
+    """Apply Prefect deployments defined in prefect.yaml."""
+    import subprocess
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    prefect_file = repo_root / "prefect.yaml"
+    if not prefect_file.exists():
+        raise click.ClickException(
+            f"prefect.yaml not found at {prefect_file}. "
+            "Run `sportscards deploy` from a source checkout."
+        )
+    subprocess.run(
+        ["prefect", "deploy", "--prefect-file", str(prefect_file), "--all"],
+        cwd=repo_root,
+        check=True,
+    )
+
+
+@cli.group()
+def scouting() -> None:
+    """NBA prospect scouting model (PRISM-style pairwise CatBoost)."""
+
+
+@scouting.command("ingest-nba")
+@click.option(
+    "--year",
+    "years",
+    multiple=True,
+    type=int,
+    help="Draft year(s) to pull. Defaults to 2010-2024.",
+)
+def scouting_ingest_nba_cmd(years: tuple[int, ...]) -> None:
+    from sportscards.scouting.nba.ingest_bref import LiveBRefClient, ingest_year
+
+    target_years = list(years) if years else list(range(2010, 2025))
+    client = LiveBRefClient()
+    for y in target_years:
+        click.echo(f"ingesting {y}…")
+        ingest_year(y, client=client)
+    click.echo(f"done ({len(target_years)} years)")
+
+
+@scouting.command("fit")
+@click.option("--start", default=2010, type=int)
+@click.option("--end", default=2024, type=int)
+def scouting_fit_cmd(start: int, end: int) -> None:
+    from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_bref import load_cohort
+    from sportscards.scouting.nba.prism import (
+        concordance,
+        predict_scores,
+        save_model,
+        train_pairwise_model,
+    )
+
+    prospects, outcomes = load_cohort(range(start, end + 1))
+    X, y, groups, _ = build_feature_matrix(prospects, outcomes)
+    model = train_pairwise_model(X, y, groups)
+    save_model(model)
+    c = concordance(predict_scores(model, X), y.to_numpy(), groups.to_numpy())
+    click.echo(f"trained: in-sample concordance={c:.3f}")
+
+
+@scouting.command("score")
+@click.option("--draft-year", type=int, required=False)
+def scouting_score_cmd(draft_year: int | None) -> None:
+    from sportscards.db.session import session_scope
+    from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_bref import load_cohort
+    from sportscards.scouting.nba.prism import load_model, predict_scores
+    from sportscards.scouting.nba.score import compute_stardom_premium, persist_scores
+
+    years = range(draft_year, draft_year + 1) if draft_year else range(2010, 2025)
+    prospects, outcomes = load_cohort(years)
+    X, _, groups, slugs = build_feature_matrix(prospects, outcomes)
+    model = load_model()
+    scores = predict_scores(model, X)
+    df = compute_stardom_premium(slugs, groups, prospects["draft_pick"], scores)
+    with session_scope() as s:
+        n = persist_scores(s, df)
+    click.echo(f"persisted {n} stardom scores ({len(df)} prospects scored)")
+
+
+@cli.group()
+def index() -> None:
+    """Repeat-sales index construction."""
+
+
+@index.command("build")
+@click.option("--bucket", default="weekly", type=click.Choice(["weekly", "monthly"]))
+@click.option(
+    "--grade-tier", "grade_tiers", multiple=True,
+    type=click.Choice(["PSA10", "PSA9", "PSA8", "lower", "all"]),
+    help="Restrict to one or more grade tiers (default: all four).",
+)
+@click.option(
+    "--era", "eras", multiple=True,
+    type=click.Choice(["modern", "vintage", "all"]),
+    help="Restrict to one or more eras (default: modern + vintage).",
+)
+@click.option("--sport", default="NBA")
+@click.option("--replace", is_flag=True, help="Delete prior rows for the same partition first.")
+def index_build_cmd(
+    bucket: str,
+    grade_tiers: tuple[str, ...],
+    eras: tuple[str, ...],
+    sport: str,
+    replace: bool,
+) -> None:
+    from sportscards.factors.index_build import build_and_persist
+
+    tiers = list(grade_tiers) or ["PSA10", "PSA9", "PSA8", "lower"]
+    era_list = list(eras) or ["modern", "vintage"]
+    stats = build_and_persist(
+        sport=sport, bucket=bucket, grade_tiers=tiers, eras=era_list, replace=replace,
+    )
+    for key, n in stats.items():
+        click.echo(f"{key}: {n} rows")
+
+
+@index.command("seed-synthetic")
+@click.option("--certs", default=2000, type=int)
+@click.option("--weeks", default=300, type=int)
+@click.option("--seed", default=42, type=int)
+@click.option("--card-id", default=1, type=int,
+              help="card_master.card_id to attach all synthetic tx to.")
+def index_seed_synthetic_cmd(certs: int, weeks: int, seed: int, card_id: int) -> None:
+    """Seed tx_raw + tx_clean with synthetic cert-tagged repeat sales for local dev."""
+    from sportscards.factors.index_build import seed_synthetic_tx
+
+    n = seed_synthetic_tx(n_certs=certs, weeks=weeks, seed=seed, card_id=card_id)
+    click.echo(f"seeded {n} synthetic tx_clean rows")
 
 
 def main() -> None:

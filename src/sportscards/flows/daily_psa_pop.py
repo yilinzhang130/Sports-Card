@@ -3,6 +3,7 @@
 Reads a priority list of (card_id, psa_spec_id) pairs and refreshes pop
 counts for as many as the quota allows.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,7 +29,9 @@ def daily_psa_pop_flow() -> int:
         if str(p.get("psa_spec_id", "TBD")) != "TBD"
     ]
     if not pairs:
-        log.warning("No PSA spec IDs filled in %s; run `sportscards psa lookup-cert`", PRIORITY_FILE)
+        log.warning(
+            "No PSA spec IDs filled in %s; run `sportscards psa lookup-cert`", PRIORITY_FILE
+        )
         return 0
     return snapshot_pop(pairs)
 

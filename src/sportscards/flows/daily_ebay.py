@@ -1,4 +1,5 @@
 """Daily eBay ingestion flow. Runs at 03:00 local."""
+
 from __future__ import annotations
 
 from prefect import flow, get_run_logger, task
