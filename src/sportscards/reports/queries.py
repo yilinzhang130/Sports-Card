@@ -7,7 +7,9 @@ placeholder instead of crashing.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import TypeVar
 
 import pandas as pd
 from sqlalchemy import inspect, text
@@ -76,7 +78,7 @@ def stardom_scores(engine: Engine | None = None, draft_year: int | None = None) 
         "FROM player_stardom_score s "
         "JOIN player_master p ON p.player_id = s.player_id "
     )
-    params: dict[str, object] = {}
+    params: dict[str, int] = {}
     if draft_year is not None:
         sql += "WHERE s.draft_year = :dy "
         params["dy"] = draft_year
@@ -147,7 +149,9 @@ def collect_letter_metrics(month: str, engine: Engine | None = None) -> LetterMe
     """Best-effort metric collection — any missing table becomes a None field."""
     eng = _engine(engine)
 
-    def _try(fn):
+    T = TypeVar("T")
+
+    def _try(fn: Callable[[], T]) -> T | None:
         try:
             return fn()
         except TableMissing:
