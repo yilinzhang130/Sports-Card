@@ -5,7 +5,10 @@ Builds a transaction-level feature matrix from ``tx_clean`` joined with
 leakage-safe asof-join (backward only) so each transaction sees the latest
 snapshot whose ``snapshot_date <= sold_at``.
 """
+
 from __future__ import annotations
+
+import contextlib
 
 import numpy as np
 import pandas as pd
@@ -14,10 +17,10 @@ from sqlalchemy.orm import Session
 
 from sportscards.db.models import Card, Player, PopSnapshot, TxClean
 
-
 # ---------------------------------------------------------------------------
 # Per-card categorical helpers
 # ---------------------------------------------------------------------------
+
 
 def parallel_tier(card: Card) -> int:
     """Map a card's parallel/print-run to a 0..5 scarcity tier.
@@ -82,6 +85,7 @@ def team_market(team: str | None) -> str:
 # ---------------------------------------------------------------------------
 # Feature matrix builder
 # ---------------------------------------------------------------------------
+
 
 def _to_naive(ts: pd.Series) -> pd.Series:
     """Strip tzinfo from a datetime series to keep merge_asof happy."""
@@ -151,10 +155,11 @@ def build_features(session: Session) -> pd.DataFrame:
             PopSnapshot.pop_count,
         )
     ).all()
+    _snap_cols = ["card_id", "grader", "grade", "snapshot_date", "pop_count"]
     snaps = (
-        pd.DataFrame(snap_rows, columns=["card_id", "grader", "grade", "snapshot_date", "pop_count"])
+        pd.DataFrame(snap_rows, columns=_snap_cols)
         if snap_rows
-        else pd.DataFrame(columns=["card_id", "grader", "grade", "snapshot_date", "pop_count"])
+        else pd.DataFrame(columns=_snap_cols)
     )
     snaps["grade"] = pd.to_numeric(snaps["grade"], errors="coerce")
     snaps["snapshot_date"] = _to_naive(snaps["snapshot_date"])
@@ -166,8 +171,9 @@ def build_features(session: Session) -> pd.DataFrame:
 
     def _asof_pop(grade_val: int, out_col: str) -> None:
         sub = (
-            snaps[(snaps["grader"] == "PSA") & (snaps["grade"] == grade_val)]
-            [["card_id", "snapshot_date", "pop_count"]]
+            snaps[(snaps["grader"] == "PSA") & (snaps["grade"] == grade_val)][
+                ["card_id", "snapshot_date", "pop_count"]
+            ]
             .sort_values("snapshot_date")
             .reset_index(drop=True)
             .rename(columns={"pop_count": out_col})
@@ -207,6 +213,7 @@ def build_features(session: Session) -> pd.DataFrame:
     def _row_tier(row: pd.Series) -> int:
         class _Stub:
             pass
+
         stub = _Stub()
         stub.is_one_of_one = bool(row["is_one_of_one"])
         stub.print_run = None if pd.isna(row["print_run"]) else int(row["print_run"])
@@ -217,10 +224,8 @@ def build_features(session: Session) -> pd.DataFrame:
 
     # player_age_at_sale (years)
     dob = pd.to_datetime(df["dob"], errors="coerce")
-    try:
+    with contextlib.suppress(TypeError, AttributeError):
         dob = dob.dt.tz_localize(None)
-    except (TypeError, AttributeError):
-        pass
     df["player_age_at_sale"] = (df["sold_at"] - dob).dt.days / 365.25
 
     # years_since_draft

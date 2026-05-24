@@ -1,8 +1,8 @@
 """End-to-end tests for the hedonic XGBoost model."""
+
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -24,23 +24,58 @@ from sportscards.factors.hedonic import (
 )
 from sportscards.factors.synthetic_data import generate_synthetic_transactions
 
-
 # ---------------------------------------------------------------------------
 # Seed: 5 players, 15 cards covering full feature variety.
 # ---------------------------------------------------------------------------
 
+
 def _seed(sess: Session) -> None:
     players = [
-        Player(name="Rookie A", position="SG", draft_year=2022, draft_pick=1,
-               team="LAL", dob=datetime(2003, 6, 1), br_slug="rookA"),
-        Player(name="Rookie B", position="PG", draft_year=2023, draft_pick=5,
-               team="BOS", dob=datetime(2004, 2, 14), br_slug="rookB"),
-        Player(name="Vet", position="PF", draft_year=2010, draft_pick=20,
-               team="GSW", dob=datetime(1988, 8, 1), br_slug="vet"),
-        Player(name="Vintage", position="SF", draft_year=1996, draft_pick=13,
-               team="LAL", dob=datetime(1978, 8, 23), br_slug="vintage"),
-        Player(name="Mid", position="C", draft_year=2015, draft_pick=10,
-               team="NYK", dob=datetime(1995, 1, 5), br_slug="mid"),
+        Player(
+            name="Rookie A",
+            position="SG",
+            draft_year=2022,
+            draft_pick=1,
+            team="LAL",
+            dob=datetime(2003, 6, 1),
+            br_slug="rookA",
+        ),
+        Player(
+            name="Rookie B",
+            position="PG",
+            draft_year=2023,
+            draft_pick=5,
+            team="BOS",
+            dob=datetime(2004, 2, 14),
+            br_slug="rookB",
+        ),
+        Player(
+            name="Vet",
+            position="PF",
+            draft_year=2010,
+            draft_pick=20,
+            team="GSW",
+            dob=datetime(1988, 8, 1),
+            br_slug="vet",
+        ),
+        Player(
+            name="Vintage",
+            position="SF",
+            draft_year=1996,
+            draft_pick=13,
+            team="LAL",
+            dob=datetime(1978, 8, 23),
+            br_slug="vintage",
+        ),
+        Player(
+            name="Mid",
+            position="C",
+            draft_year=2015,
+            draft_pick=10,
+            team="NYK",
+            dob=datetime(1995, 1, 5),
+            br_slug="mid",
+        ),
     ]
     for p in players:
         sess.add(p)
@@ -49,45 +84,157 @@ def _seed(sess: Session) -> None:
 
     cards = [
         # Rookie A: base, refractor, gold /10, 1of1, holo /25
-        Card(year=2022, manufacturer="Panini", set_name="Prizm", card_number="100",
-             parallel="Base", player_id=pids[0], is_rookie=True),
-        Card(year=2022, manufacturer="Panini", set_name="Prizm", card_number="100",
-             parallel="Silver Refractor", player_id=pids[0], is_rookie=True),
-        Card(year=2022, manufacturer="Panini", set_name="Select", card_number="200",
-             parallel="Gold", print_run=10, player_id=pids[0], is_rookie=True,
-             has_auto=True),
-        Card(year=2022, manufacturer="Panini", set_name="National Treasures",
-             card_number="50", parallel="Logoman", print_run=1, player_id=pids[0],
-             is_rookie=True, has_auto=True, has_patch=True, is_one_of_one=True),
-        Card(year=2022, manufacturer="Panini", set_name="Optic", card_number="55",
-             parallel="Holo", print_run=25, player_id=pids[0], is_rookie=True),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="100",
+            parallel="Base",
+            player_id=pids[0],
+            is_rookie=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="100",
+            parallel="Silver Refractor",
+            player_id=pids[0],
+            is_rookie=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Select",
+            card_number="200",
+            parallel="Gold",
+            print_run=10,
+            player_id=pids[0],
+            is_rookie=True,
+            has_auto=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="National Treasures",
+            card_number="50",
+            parallel="Logoman",
+            print_run=1,
+            player_id=pids[0],
+            is_rookie=True,
+            has_auto=True,
+            has_patch=True,
+            is_one_of_one=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Optic",
+            card_number="55",
+            parallel="Holo",
+            print_run=25,
+            player_id=pids[0],
+            is_rookie=True,
+        ),
         # Rookie B
-        Card(year=2023, manufacturer="Panini", set_name="Prizm", card_number="300",
-             parallel="Base", player_id=pids[1], is_rookie=True),
-        Card(year=2023, manufacturer="Panini", set_name="Flawless", card_number="12",
-             parallel="Ruby", print_run=15, player_id=pids[1], is_rookie=True,
-             has_patch=True),
-        Card(year=2023, manufacturer="Panini", set_name="Immaculate", card_number="22",
-             parallel="Platinum", print_run=1, player_id=pids[1], is_rookie=True,
-             is_one_of_one=True, has_auto=True),
+        Card(
+            year=2023,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="300",
+            parallel="Base",
+            player_id=pids[1],
+            is_rookie=True,
+        ),
+        Card(
+            year=2023,
+            manufacturer="Panini",
+            set_name="Flawless",
+            card_number="12",
+            parallel="Ruby",
+            print_run=15,
+            player_id=pids[1],
+            is_rookie=True,
+            has_patch=True,
+        ),
+        Card(
+            year=2023,
+            manufacturer="Panini",
+            set_name="Immaculate",
+            card_number="22",
+            parallel="Platinum",
+            print_run=1,
+            player_id=pids[1],
+            is_rookie=True,
+            is_one_of_one=True,
+            has_auto=True,
+        ),
         # Vet
-        Card(year=2015, manufacturer="Panini", set_name="Prizm", card_number="33",
-             parallel="Base", player_id=pids[2]),
-        Card(year=2018, manufacturer="Panini", set_name="Donruss Optic",
-             card_number="44", parallel="Holo", print_run=99, player_id=pids[2]),
-        Card(year=2019, manufacturer="Panini", set_name="Flawless", card_number="7",
-             parallel="Ruby", print_run=15, player_id=pids[2], has_patch=True),
+        Card(
+            year=2015,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="33",
+            parallel="Base",
+            player_id=pids[2],
+        ),
+        Card(
+            year=2018,
+            manufacturer="Panini",
+            set_name="Donruss Optic",
+            card_number="44",
+            parallel="Holo",
+            print_run=99,
+            player_id=pids[2],
+        ),
+        Card(
+            year=2019,
+            manufacturer="Panini",
+            set_name="Flawless",
+            card_number="7",
+            parallel="Ruby",
+            print_run=15,
+            player_id=pids[2],
+            has_patch=True,
+        ),
         # Mid
-        Card(year=2015, manufacturer="Panini", set_name="Select", card_number="88",
-             parallel="Gold", print_run=10, player_id=pids[4], has_auto=True),
-        Card(year=2016, manufacturer="Panini", set_name="Hoops", card_number="99",
-             parallel="Base", player_id=pids[4]),
+        Card(
+            year=2015,
+            manufacturer="Panini",
+            set_name="Select",
+            card_number="88",
+            parallel="Gold",
+            print_run=10,
+            player_id=pids[4],
+            has_auto=True,
+        ),
+        Card(
+            year=2016,
+            manufacturer="Panini",
+            set_name="Hoops",
+            card_number="99",
+            parallel="Base",
+            player_id=pids[4],
+        ),
         # Vintage
-        Card(year=2003, manufacturer="Topps", set_name="Topps Chrome",
-             card_number="111", parallel="Refractor", print_run=99,
-             player_id=pids[3], is_rookie=True),
-        Card(year=2008, manufacturer="Panini", set_name="Hoops", card_number="22",
-             parallel="Base", player_id=pids[3]),
+        Card(
+            year=2003,
+            manufacturer="Topps",
+            set_name="Topps Chrome",
+            card_number="111",
+            parallel="Refractor",
+            print_run=99,
+            player_id=pids[3],
+            is_rookie=True,
+        ),
+        Card(
+            year=2008,
+            manufacturer="Panini",
+            set_name="Hoops",
+            card_number="22",
+            parallel="Base",
+            player_id=pids[3],
+        ),
     ]
     for c in cards:
         sess.add(c)
@@ -97,6 +244,7 @@ def _seed(sess: Session) -> None:
 # ---------------------------------------------------------------------------
 # Module-scoped fixture: trained model (slow — fit once)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def trained() -> dict:
@@ -126,6 +274,7 @@ def trained() -> dict:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 def test_monotone_constraints_aligned():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -142,7 +291,7 @@ def test_monotone_constraints_aligned():
     # Booleans next, then one-hots → all zero.
     n_num = len(NUMERICAL_FEATURES)
     n_bool = len(BOOLEAN_FEATURES)
-    assert all(c == 0 for c in monotone[n_num + n_bool:])
+    assert all(c == 0 for c in monotone[n_num + n_bool :])
     sess.close()
 
 
@@ -167,9 +316,7 @@ def test_planted_coefficients_in_top_importances(trained):
     assert "parallel_tier" in top3_names, f"parallel_tier missing from top-3: {top3}"
     # At least 2 of these three planted/derived scarcity features in top-3.
     scarcity = {"parallel_tier", "print_run_log", "is_one_of_one"}
-    assert len(top3_names & scarcity) >= 2, (
-        f"expected >=2 scarcity features in top-3, got {top3}"
-    )
+    assert len(top3_names & scarcity) >= 2, f"expected >=2 scarcity features in top-3, got {top3}"
 
 
 def test_oos_mae_below_threshold(trained):

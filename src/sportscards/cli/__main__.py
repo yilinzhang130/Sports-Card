@@ -266,7 +266,10 @@ def rank_mispricing_cmd(top: int) -> None:
         table.add_column(col)
     for r in rows:
         table.add_row(
-            str(r.name), str(r.year), str(r.set_name), str(r.parallel),
+            str(r.name),
+            str(r.year),
+            str(r.set_name),
+            str(r.parallel),
             f"{r.slab_grader} {r.slab_grade}",
             f"${float(r.price_usd):,.2f}",
             f"{float(r.predicted_log_price):.3f}",
@@ -348,12 +351,16 @@ def index() -> None:
 @index.command("build")
 @click.option("--bucket", default="weekly", type=click.Choice(["weekly", "monthly"]))
 @click.option(
-    "--grade-tier", "grade_tiers", multiple=True,
+    "--grade-tier",
+    "grade_tiers",
+    multiple=True,
     type=click.Choice(["PSA10", "PSA9", "PSA8", "lower", "all"]),
     help="Restrict to one or more grade tiers (default: all four).",
 )
 @click.option(
-    "--era", "eras", multiple=True,
+    "--era",
+    "eras",
+    multiple=True,
     type=click.Choice(["modern", "vintage", "all"]),
     help="Restrict to one or more eras (default: modern + vintage).",
 )
@@ -371,7 +378,11 @@ def index_build_cmd(
     tiers = list(grade_tiers) or ["PSA10", "PSA9", "PSA8", "lower"]
     era_list = list(eras) or ["modern", "vintage"]
     stats = build_and_persist(
-        sport=sport, bucket=bucket, grade_tiers=tiers, eras=era_list, replace=replace,
+        sport=sport,
+        bucket=bucket,
+        grade_tiers=tiers,
+        eras=era_list,
+        replace=replace,
     )
     for key, n in stats.items():
         click.echo(f"{key}: {n} rows")
@@ -381,8 +392,9 @@ def index_build_cmd(
 @click.option("--certs", default=2000, type=int)
 @click.option("--weeks", default=300, type=int)
 @click.option("--seed", default=42, type=int)
-@click.option("--card-id", default=1, type=int,
-              help="card_master.card_id to attach all synthetic tx to.")
+@click.option(
+    "--card-id", default=1, type=int, help="card_master.card_id to attach all synthetic tx to."
+)
 def index_seed_synthetic_cmd(certs: int, weeks: int, seed: int, card_id: int) -> None:
     """Seed tx_raw + tx_clean with synthetic cert-tagged repeat sales for local dev."""
     from sportscards.factors.index_build import seed_synthetic_tx

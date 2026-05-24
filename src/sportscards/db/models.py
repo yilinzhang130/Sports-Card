@@ -157,13 +157,9 @@ class TxMispricing(Base):
     model_version: Mapped[str] = mapped_column(String(32), primary_key=True)
     residual: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
     predicted_log_price: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
-    fit_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    fit_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_tx_mispricing_residual", "residual"),
-    )
+    __table_args__ = (Index("ix_tx_mispricing_residual", "residual"),)
 
 
 class RepeatSalesIndex(Base):
@@ -174,9 +170,7 @@ class RepeatSalesIndex(Base):
 
     __tablename__ = "repeat_sales_index"
 
-    period_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), primary_key=True
-    )
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     sport: Mapped[str] = mapped_column(String(8), primary_key=True)
     bucket: Mapped[str] = mapped_column(String(8), primary_key=True)
     grade_tier: Mapped[str] = mapped_column(String(8), primary_key=True)
@@ -185,6 +179,4 @@ class RepeatSalesIndex(Base):
     n_pairs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     se: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
 
-    __table_args__ = (
-        Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),
-    )
+    __table_args__ = (Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),)

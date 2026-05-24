@@ -1,11 +1,11 @@
 """Tests for hedonic feature engineering."""
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import numpy as np
-import pandas as pd
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -19,10 +19,10 @@ from sportscards.factors.features import (
 )
 from sportscards.factors.synthetic_data import generate_synthetic_transactions
 
-
 # ---------------------------------------------------------------------------
 # In-memory SQLite fixture
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def session() -> Session:
@@ -74,35 +74,104 @@ def _seed(sess: Session) -> None:
 
     cards = [
         # Modern rookie variants
-        Card(year=2022, manufacturer="Panini", set_name="Prizm",
-             card_number="100", parallel="Base", player_id=pid_rookie, is_rookie=True),
-        Card(year=2022, manufacturer="Panini", set_name="Prizm",
-             card_number="100", parallel="Silver Refractor", player_id=pid_rookie,
-             is_rookie=True),
-        Card(year=2022, manufacturer="Panini", set_name="Select",
-             card_number="200", parallel="Gold", print_run=10,
-             player_id=pid_rookie, is_rookie=True, has_auto=True),
-        Card(year=2022, manufacturer="Panini", set_name="National Treasures",
-             card_number="50", parallel="Logoman", print_run=1,
-             player_id=pid_rookie, is_rookie=True, has_auto=True, has_patch=True,
-             is_one_of_one=True),
-        Card(year=2022, manufacturer="Panini", set_name="Optic",
-             card_number="55", parallel="Holo", print_run=25,
-             player_id=pid_rookie, is_rookie=True),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="100",
+            parallel="Base",
+            player_id=pid_rookie,
+            is_rookie=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="100",
+            parallel="Silver Refractor",
+            player_id=pid_rookie,
+            is_rookie=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Select",
+            card_number="200",
+            parallel="Gold",
+            print_run=10,
+            player_id=pid_rookie,
+            is_rookie=True,
+            has_auto=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="National Treasures",
+            card_number="50",
+            parallel="Logoman",
+            print_run=1,
+            player_id=pid_rookie,
+            is_rookie=True,
+            has_auto=True,
+            has_patch=True,
+            is_one_of_one=True,
+        ),
+        Card(
+            year=2022,
+            manufacturer="Panini",
+            set_name="Optic",
+            card_number="55",
+            parallel="Holo",
+            print_run=25,
+            player_id=pid_rookie,
+            is_rookie=True,
+        ),
         # Modern vet
-        Card(year=2015, manufacturer="Panini", set_name="Prizm",
-             card_number="33", parallel="Base", player_id=pid_vet),
-        Card(year=2018, manufacturer="Panini", set_name="Donruss",
-             card_number="44", parallel="Base", player_id=pid_vet),
-        Card(year=2019, manufacturer="Panini", set_name="Flawless",
-             card_number="7", parallel="Ruby", print_run=15,
-             player_id=pid_vet, has_patch=True),
+        Card(
+            year=2015,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="33",
+            parallel="Base",
+            player_id=pid_vet,
+        ),
+        Card(
+            year=2018,
+            manufacturer="Panini",
+            set_name="Donruss",
+            card_number="44",
+            parallel="Base",
+            player_id=pid_vet,
+        ),
+        Card(
+            year=2019,
+            manufacturer="Panini",
+            set_name="Flawless",
+            card_number="7",
+            parallel="Ruby",
+            print_run=15,
+            player_id=pid_vet,
+            has_patch=True,
+        ),
         # Vintage (pre-2010)
-        Card(year=2003, manufacturer="Topps", set_name="Topps Chrome",
-             card_number="111", parallel="Refractor", print_run=99,
-             player_id=pid_vintage, is_rookie=True),
-        Card(year=2008, manufacturer="Panini", set_name="Hoops",
-             card_number="22", parallel="Base", player_id=pid_vintage),
+        Card(
+            year=2003,
+            manufacturer="Topps",
+            set_name="Topps Chrome",
+            card_number="111",
+            parallel="Refractor",
+            print_run=99,
+            player_id=pid_vintage,
+            is_rookie=True,
+        ),
+        Card(
+            year=2008,
+            manufacturer="Panini",
+            set_name="Hoops",
+            card_number="22",
+            parallel="Base",
+            player_id=pid_vintage,
+        ),
     ]
     for c in cards:
         sess.add(c)
@@ -112,6 +181,7 @@ def _seed(sess: Session) -> None:
 # ---------------------------------------------------------------------------
 # Tier mapping unit tests
 # ---------------------------------------------------------------------------
+
 
 class _CardStub:
     def __init__(self, is_one_of_one=False, print_run=None, parallel="Base"):
@@ -153,17 +223,31 @@ def test_team_market_mapping():
 # build_features tests
 # ---------------------------------------------------------------------------
 
+
 def test_build_features_columns_present(session):
     generate_synthetic_transactions(session, n_per_card=5, seed=7)
     session.commit()
     df = build_features(session)
     expected = {
-        "tx_id", "sold_at", "log_price",
-        "log_pop_psa10", "log_pop_psa9_or_better", "parallel_tier",
-        "print_run_log", "slab_grade", "player_age_at_sale",
-        "years_since_draft", "draft_pick",
-        "is_rookie", "has_auto", "has_patch", "is_one_of_one", "era_modern",
-        "set_tier", "team_market", "slab_grader",
+        "tx_id",
+        "sold_at",
+        "log_price",
+        "log_pop_psa10",
+        "log_pop_psa9_or_better",
+        "parallel_tier",
+        "print_run_log",
+        "slab_grade",
+        "player_age_at_sale",
+        "years_since_draft",
+        "draft_pick",
+        "is_rookie",
+        "has_auto",
+        "has_patch",
+        "is_one_of_one",
+        "era_modern",
+        "set_tier",
+        "team_market",
+        "slab_grader",
     }
     assert expected.issubset(set(df.columns))
     assert np.isfinite(df["log_price"]).all()
@@ -188,31 +272,57 @@ def test_build_features_no_leakage(session):
     t = datetime(2024, 6, 15, 12, 0, 0)
     # Snapshot BEFORE sale (should be chosen): pop=42
     # Snapshot AFTER  sale (should be ignored): pop=999
-    session.add(PopSnapshot(
-        snapshot_date=t - timedelta(days=30), card_id=card.card_id,
-        grader="PSA", grade=Decimal("10"), pop_count=42,
-    ))
-    session.add(PopSnapshot(
-        snapshot_date=t + timedelta(days=30), card_id=card.card_id,
-        grader="PSA", grade=Decimal("10"), pop_count=999,
-    ))
-    session.add(PopSnapshot(
-        snapshot_date=t - timedelta(days=30), card_id=card.card_id,
-        grader="PSA", grade=Decimal("9"), pop_count=20,
-    ))
+    session.add(
+        PopSnapshot(
+            snapshot_date=t - timedelta(days=30),
+            card_id=card.card_id,
+            grader="PSA",
+            grade=Decimal("10"),
+            pop_count=42,
+        )
+    )
+    session.add(
+        PopSnapshot(
+            snapshot_date=t + timedelta(days=30),
+            card_id=card.card_id,
+            grader="PSA",
+            grade=Decimal("10"),
+            pop_count=999,
+        )
+    )
+    session.add(
+        PopSnapshot(
+            snapshot_date=t - timedelta(days=30),
+            card_id=card.card_id,
+            grader="PSA",
+            grade=Decimal("9"),
+            pop_count=20,
+        )
+    )
 
     raw = TxRaw(
-        source="test", raw_title="x", raw_price=Decimal("100.00"),
-        raw_currency="USD", sold_at=t, external_id=f"test-{raw_id_start}",
+        source="test",
+        raw_title="x",
+        raw_price=Decimal("100.00"),
+        raw_currency="USD",
+        sold_at=t,
+        external_id=f"test-{raw_id_start}",
         raw_json={},
     )
     session.add(raw)
     session.flush()
-    session.add(TxClean(
-        raw_id=raw.raw_id, card_id=card.card_id, slab_grader="PSA",
-        slab_grade=Decimal("10"), price_usd=Decimal("100.00"),
-        sold_at=t, parser_confidence=Decimal("1.000"), parser_method="test",
-    ))
+    session.add(
+        TxClean(
+            raw_id=raw.raw_id,
+            card_id=card.card_id,
+            slab_grader="PSA",
+            slab_grade=Decimal("10"),
+            price_usd=Decimal("100.00"),
+            sold_at=t,
+            parser_confidence=Decimal("1.000"),
+            parser_method="test",
+        )
+    )
     session.commit()
 
     df = build_features(session)

@@ -6,9 +6,10 @@ hyperparameter search with a time-aware holdout, persists per-transaction
 residuals (predicted - actual log price) to ``tx_mispricing``, and pickles
 the (model, encoder, metrics) bundle to disk.
 """
+
 from __future__ import annotations
 
-import logging
+import contextlib
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -26,7 +27,6 @@ from sqlalchemy.orm import Session
 
 from sportscards.db.models import TxMispricing
 
-
 MODEL_VERSION = "hedonic_v1"
 MODEL_PATH = Path("models/hedonic_v1.joblib")
 
@@ -35,14 +35,14 @@ MODEL_PATH = Path("models/hedonic_v1.joblib")
 # numerical-feature portion. Categorical one-hot columns are appended
 # AFTER these, with constraint 0 each, computed at fit time.
 NUMERICAL_FEATURES: list[str] = [
-    "log_pop_psa10",            # -1: pop up → price down
-    "log_pop_psa9_or_better",   # -1: same
-    "parallel_tier",            # +1: scarcer → pricier
-    "print_run_log",            # -1: more printed → cheaper
-    "slab_grade",               #  0
-    "player_age_at_sale",       #  0
-    "years_since_draft",        #  0
-    "draft_pick",               #  0 (lower pick = better player but signal is noisy)
+    "log_pop_psa10",  # -1: pop up → price down
+    "log_pop_psa9_or_better",  # -1: same
+    "parallel_tier",  # +1: scarcer → pricier
+    "print_run_log",  # -1: more printed → cheaper
+    "slab_grade",  #  0
+    "player_age_at_sale",  #  0
+    "years_since_draft",  #  0
+    "draft_pick",  #  0 (lower pick = better player but signal is noisy)
 ]
 NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0)
 
@@ -100,20 +100,15 @@ def fit(
     sold_at = pd.to_datetime(df["sold_at"])
 
     # --- determine train/test cutoff ---
-    if train_end is None:
-        cutoff = sold_at.quantile(0.8)
-    else:
-        cutoff = pd.Timestamp(train_end)
+    cutoff = sold_at.quantile(0.8) if train_end is None else pd.Timestamp(train_end)
 
     # Make comparable (both tz-naive)
     try:
         sold_at_cmp = sold_at.dt.tz_localize(None)
     except (TypeError, AttributeError):
         sold_at_cmp = sold_at
-    try:
+    with contextlib.suppress(TypeError, AttributeError):
         cutoff = cutoff.tz_localize(None)  # type: ignore[union-attr]
-    except (TypeError, AttributeError):
-        pass
 
     train_mask = (sold_at_cmp < cutoff).to_numpy()
     test_mask = (sold_at_cmp >= cutoff).to_numpy()
@@ -187,9 +182,7 @@ def fit(
     )
     final_model.fit(X_all, y_all)
 
-    importance = dict(
-        zip(feature_names, final_model.feature_importances_.tolist(), strict=True)
-    )
+    importance = dict(zip(feature_names, final_model.feature_importances_.tolist(), strict=True))
 
     metrics: dict[str, Any] = {
         "oos_mae": oos_mae,

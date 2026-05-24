@@ -10,11 +10,12 @@ Two unrelated generators live here:
   cert-tagged repeat sales driven by a known latent weekly index, for testing
   the repeat-sales estimator.
 """
+
 from __future__ import annotations
 
 import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import numpy as np
@@ -28,14 +29,14 @@ from sportscards.factors.features import parallel_tier
 # Planted ground-truth coefficients. Tests import this dict and assert the
 # fitted hedonic model recovers each coefficient within tolerance.
 PLANTED_COEFFS: dict[str, float] = {
-    "log_pop_psa10": -0.4,   # rarer (lower pop) = pricier
-    "parallel_tier": 0.5,    # scarcer parallel = pricier
+    "log_pop_psa10": -0.4,  # rarer (lower pop) = pricier
+    "parallel_tier": 0.5,  # scarcer parallel = pricier
     "is_rookie": 0.6,
     "has_auto": 0.4,
     "has_patch": 0.3,
     "is_one_of_one": 1.5,
-    "grade_10_premium": 0.8, # PSA 10 vs PSA 9
-    "era_modern": -0.2,      # modern (>=2010) vs vintage
+    "grade_10_premium": 0.8,  # PSA 10 vs PSA 9
+    "era_modern": -0.2,  # modern (>=2010) vs vintage
 }
 
 # Intercept for the generative log-price model — picks a sensible baseline so
@@ -79,7 +80,7 @@ def generate_synthetic_transactions(
         Number of ``tx_clean`` (== ``tx_raw``) rows written.
     """
     rng = random.Random(seed)
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
 
     cards: list[Card] = list(session.scalars(select(Card)).all())
     if not cards:
@@ -243,13 +244,15 @@ def generate_synthetic_tx(
             day_offset = int(rng.integers(0, 7))
             sold_at = week_starts[w] + pd.Timedelta(days=day_offset)
             price = cert_level * index[w] * float(np.exp(rng.normal(0, noise_sigma)))
-            rows.append({
-                "cert_number": f"C{c:05d}",
-                "sold_at": sold_at,
-                "price_usd": float(price),
-                "slab_grader": "PSA",
-                "slab_grade": 10.0,
-            })
+            rows.append(
+                {
+                    "cert_number": f"C{c:05d}",
+                    "sold_at": sold_at,
+                    "price_usd": float(price),
+                    "slab_grader": "PSA",
+                    "slab_grade": 10.0,
+                }
+            )
 
     tx = pd.DataFrame(rows)
     return tx, truth

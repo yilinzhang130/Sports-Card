@@ -7,6 +7,7 @@ Create Date: 2026-05-25
 Chained after 0003_repeat_sales_index (Phase 2A) which landed on main while
 this branch was open; 0002 is player_stardom_score (Phase 3).
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
