@@ -112,11 +112,19 @@ def main() -> None:
     return_corr = float(np.corrcoef(ret_ours, ret_cl50)[0, 1])
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
+    spec_line = (
+        f"- Sport: **{args.sport}**, era: **{args.era}**, "
+        f"grade: **{args.grade_tier}**, bucket: **{args.bucket}**"
+    )
+    window_line = (
+        f"- Overlap window: {merged['period_start'].min().date()} → "
+        f"{merged['period_start'].max().date()} ({len(merged)} buckets)"
+    )
     args.out.write_text(
         f"""# Repeat-sales index vs Card Ladder CL50
 
-- Sport: **{args.sport}**, era: **{args.era}**, grade: **{args.grade_tier}**, bucket: **{args.bucket}**
-- Overlap window: {merged['period_start'].min().date()} → {merged['period_start'].max().date()} ({len(merged)} buckets)
+{spec_line}
+{window_line}
 
 ## Correlations
 

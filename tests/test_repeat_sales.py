@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from sportscards.factors.repeat_sales import build_pairs, estimate_index
 from sportscards.factors.synthetic_data import generate_synthetic_tx
