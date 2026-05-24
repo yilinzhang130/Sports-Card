@@ -16,7 +16,7 @@ from sqlalchemy import inspect, select
 
 def _has_table(session: Any, name: str) -> bool:
     try:
-        return inspect(session.get_bind()).has_table(name)
+        return bool(inspect(session.get_bind()).has_table(name))
     except Exception:
         return False
 

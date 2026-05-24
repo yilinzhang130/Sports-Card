@@ -32,7 +32,9 @@ from sportscards.portfolio.construction import (
     build_portfolio,
 )
 from sportscards.portfolio.transaction_costs import (
+    BuyChannel,
     FeeSchedule,
+    SellChannel,
     landed_cost,
     net_proceeds,
 )
@@ -49,8 +51,8 @@ class BacktestConfig:
     weekly_turnover_pct_cap: float = 0.50
     fee_schedule: FeeSchedule = field(default_factory=FeeSchedule)
     allocation: AllocationConfig = field(default_factory=AllocationConfig)
-    trading_channel_buy: str = "ebay"
-    trading_channel_sell: str = "ebay"
+    trading_channel_buy: BuyChannel = "ebay"
+    trading_channel_sell: SellChannel = "ebay"
 
 
 @dataclass
@@ -131,7 +133,9 @@ def run_backtest(
 
     for d in daily_dates:
         # Mark NAV
-        prices_today = prices_wide.loc[d] if d in prices_wide.index else pd.Series(dtype=float)
+        prices_today = (
+            pd.Series(prices_wide.loc[d]) if d in prices_wide.index else pd.Series(dtype=float)
+        )
         portfolio_value = cash + sum(
             units * float(prices_today.get(cid, 0.0) or 0.0) for cid, units in holdings.items()
         )
@@ -208,7 +212,9 @@ def run_backtest(
             next_trade_window = d + pd.Timedelta(days=7)
 
         # Re-mark after trades
-        prices_today = prices_wide.loc[d] if d in prices_wide.index else pd.Series(dtype=float)
+        prices_today = (
+            pd.Series(prices_wide.loc[d]) if d in prices_wide.index else pd.Series(dtype=float)
+        )
         portfolio_value = cash + sum(
             units * float(prices_today.get(cid, 0.0) or 0.0) for cid, units in holdings.items()
         )

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,7 @@ ANCHORS: tuple[AnchorSpec, ...] = (
 )
 
 
-def resolve_anchors(session) -> list[tuple[AnchorSpec, int | None]]:
+def resolve_anchors(session: Any) -> list[tuple[AnchorSpec, int | None]]:
     """Resolve each anchor to a ``card_master.card_id`` (or ``None`` if missing).
 
     Warns about unresolved anchors so missing seed data doesn't silently
