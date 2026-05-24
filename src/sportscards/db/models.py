@@ -121,6 +121,16 @@ class ParseFailure(Base):
     )
 
 
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+
+    run_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    params_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
 class PlayerStardomScore(Base):
     """Per-player stardom-premium score from the PRISM-style scouting model.
 
@@ -158,9 +168,7 @@ class RepeatSalesIndex(Base):
 
     __tablename__ = "repeat_sales_index"
 
-    period_start: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), primary_key=True
-    )
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
     sport: Mapped[str] = mapped_column(String(8), primary_key=True)
     bucket: Mapped[str] = mapped_column(String(8), primary_key=True)
     grade_tier: Mapped[str] = mapped_column(String(8), primary_key=True)
@@ -169,6 +177,4 @@ class RepeatSalesIndex(Base):
     n_pairs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     se: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
 
-    __table_args__ = (
-        Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),
-    )
+    __table_args__ = (Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),)

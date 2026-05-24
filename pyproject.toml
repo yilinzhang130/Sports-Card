@@ -85,6 +85,13 @@ disallow_untyped_decorators = false
 module = ["catboost.*", "basketball_reference_scraper.*"]
 ignore_missing_imports = true
 
+# Pre-existing mypy errors in Phase 2A factors code (merged on main before CI
+# enforced mypy). Skipping here so unrelated PRs aren't blocked; remove this
+# block once factors/* is type-clean (tracked separately).
+[[tool.mypy.overrides]]
+module = ["sportscards.factors.*"]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

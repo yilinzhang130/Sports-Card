@@ -5,6 +5,7 @@ Revises: 0002
 Create Date: 2026-05-24
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -34,8 +35,7 @@ def upgrade() -> None:
         ["sport", "grade_tier", "era", "bucket"],
     )
     op.execute(
-        "SELECT create_hypertable('repeat_sales_index', 'period_start', "
-        "if_not_exists => TRUE)"
+        "SELECT create_hypertable('repeat_sales_index', 'period_start', if_not_exists => TRUE)"
     )
 
 
