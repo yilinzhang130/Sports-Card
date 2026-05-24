@@ -1,4 +1,5 @@
 """Seed loaders for player_master and card_master from YAML checklists."""
+
 from __future__ import annotations
 
 import logging
@@ -23,12 +24,12 @@ def seed_players(path: Path | None = None) -> int:
     added = 0
     with session_scope() as s:
         for row in data:
-            stmt = pg_insert(Player).values(**row).on_conflict_do_nothing(
-                index_elements=["br_slug"]
+            stmt = (
+                pg_insert(Player).values(**row).on_conflict_do_nothing(index_elements=["br_slug"])
             )
             res = s.execute(stmt)
             # psycopg returns -1 for ON CONFLICT DO NOTHING when nothing inserted
-            added += max(res.rowcount or 0, 0)
+            added += max(res.rowcount or 0, 0)  # type: ignore[attr-defined]
     log.info("seeded %d players", added)
     return added
 
@@ -49,14 +50,13 @@ def seed_cards(path: Path | None = None) -> int:
                 log.warning("seed_cards: unknown player %r, skipping", player_name)
                 continue
             row["player_id"] = player_id
-            # Map yaml `set` -> ORM column attr `set_name`
-            if "set" in row:
-                row["set"] = row["set"]  # column literal name remains "set" in DB
-            stmt = pg_insert(Card.__table__).values(**row).on_conflict_do_nothing(
-                constraint="uq_card_master_identity"
+            stmt = (
+                pg_insert(Card)
+                .values(**row)
+                .on_conflict_do_nothing(constraint="uq_card_master_identity")
             )
             res = s.execute(stmt)
             # psycopg returns -1 for ON CONFLICT DO NOTHING when nothing inserted
-            added += max(res.rowcount or 0, 0)
+            added += max(res.rowcount or 0, 0)  # type: ignore[attr-defined]
     log.info("seeded %d cards", added)
     return added

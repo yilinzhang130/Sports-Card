@@ -6,35 +6,35 @@ have a known true ordering by BPM, and the test asserts the pairwise model
 recovers it with concordance > 0.85 and that the score table is populated
 for every prospect in the cohort.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
 from sportscards.scouting.nba import features as feat
 from sportscards.scouting.nba import ingest_bref, prism, score
 
-
 # ---------------------------------------------------------------------------
 # Synthetic cohort
 # ---------------------------------------------------------------------------
 SYNTHETIC = [
-    # (slug, name, draft_pick, position, age, usg, ts, trb, ast, stl, blk, sos, recruit_pct, true_bpm)
-    ("luka",     "Luka Doncic",   3,  "PG", 19.2, 32.0, 0.61, 13.0, 28.0, 1.8, 0.7, 8.0, 0.99, 30.0),
-    ("trae",     "Trae Young",    5,  "PG", 19.8, 36.0, 0.59,  6.0, 35.0, 1.5, 0.4, 6.0, 0.95, 20.0),
-    ("ayton",    "Deandre Ayton", 1,  "C",  19.9, 28.0, 0.62, 20.0,  4.0, 0.5, 4.0, 7.0, 0.92, 10.0),
-    ("bagley",   "Marvin Bagley", 2,  "PF", 19.1, 27.0, 0.61, 18.0,  3.0, 0.6, 2.5, 6.5, 0.96,  3.0),
-    ("jjj",      "Jaren Jackson", 4,  "PF", 18.8, 22.0, 0.60, 14.0,  3.5, 1.0, 5.0, 7.5, 0.91, 18.0),
-    ("mpj",      "Michael Porter", 14, "SF", 20.1, 30.0, 0.55, 16.0,  4.0, 0.6, 1.5, 7.0, 0.97,  5.0),
-    ("sga",      "SGA",           11, "SG", 20.2, 24.0, 0.60,  7.0,  9.0, 1.6, 0.6, 7.0, 0.88, 25.0),
-    ("knox",     "Kevin Knox",     9, "SF", 18.9, 26.0, 0.55,  9.0,  2.5, 0.8, 0.7, 6.0, 0.85,  1.0),
-    ("bridges",  "Mikal Bridges", 10, "SF", 21.7, 18.0, 0.61,  7.0,  6.0, 1.5, 1.0, 7.5, 0.80, 14.0),
-    ("walker",   "Lonnie Walker", 18, "SG", 19.6, 24.0, 0.54,  6.0,  6.0, 1.1, 0.5, 6.5, 0.82,  2.0),
-    ("smith",    "Zhaire Smith",  16, "SG", 19.0, 19.0, 0.60,  8.0,  6.0, 1.7, 1.4, 6.0, 0.78,  0.5),
-    ("robinson", "Mitchell Rob.", 36, "C",  20.0, 25.0, 0.65, 19.0,  2.0, 0.8, 4.5, 5.0, 0.55, 12.0),
+    # (slug, name, draft_pick, position, age, usg, ts, trb, ast, stl, blk, sos,
+    #  recruit_pct, true_bpm)
+    ("luka", "Luka Doncic", 3, "PG", 19.2, 32.0, 0.61, 13.0, 28.0, 1.8, 0.7, 8.0, 0.99, 30.0),
+    ("trae", "Trae Young", 5, "PG", 19.8, 36.0, 0.59, 6.0, 35.0, 1.5, 0.4, 6.0, 0.95, 20.0),
+    ("ayton", "Deandre Ayton", 1, "C", 19.9, 28.0, 0.62, 20.0, 4.0, 0.5, 4.0, 7.0, 0.92, 10.0),
+    ("bagley", "Marvin Bagley", 2, "PF", 19.1, 27.0, 0.61, 18.0, 3.0, 0.6, 2.5, 6.5, 0.96, 3.0),
+    ("jjj", "Jaren Jackson", 4, "PF", 18.8, 22.0, 0.60, 14.0, 3.5, 1.0, 5.0, 7.5, 0.91, 18.0),
+    ("mpj", "Michael Porter", 14, "SF", 20.1, 30.0, 0.55, 16.0, 4.0, 0.6, 1.5, 7.0, 0.97, 5.0),
+    ("sga", "SGA", 11, "SG", 20.2, 24.0, 0.60, 7.0, 9.0, 1.6, 0.6, 7.0, 0.88, 25.0),
+    ("knox", "Kevin Knox", 9, "SF", 18.9, 26.0, 0.55, 9.0, 2.5, 0.8, 0.7, 6.0, 0.85, 1.0),
+    ("bridges", "Mikal Bridges", 10, "SF", 21.7, 18.0, 0.61, 7.0, 6.0, 1.5, 1.0, 7.5, 0.80, 14.0),
+    ("walker", "Lonnie Walker", 18, "SG", 19.6, 24.0, 0.54, 6.0, 6.0, 1.1, 0.5, 6.5, 0.82, 2.0),
+    ("smith", "Zhaire Smith", 16, "SG", 19.0, 19.0, 0.60, 8.0, 6.0, 1.7, 1.4, 6.0, 0.78, 0.5),
+    ("robinson", "Mitchell Rob.", 36, "C", 20.0, 25.0, 0.65, 19.0, 2.0, 0.8, 4.5, 5.0, 0.55, 12.0),
 ]
 
 
@@ -64,8 +64,15 @@ def synthetic_data() -> tuple[pd.DataFrame, pd.DataFrame]:
         ]
     )
     outcomes = pd.DataFrame(
-        [{"br_slug": r[0], "career_bpm_5y": r[13], "career_ws_5y": r[13] * 2, "career_vorp_5y": r[13] / 3}
-         for r in SYNTHETIC]
+        [
+            {
+                "br_slug": r[0],
+                "career_bpm_5y": r[13],
+                "career_ws_5y": r[13] * 2,
+                "career_vorp_5y": r[13] / 3,
+            }
+            for r in SYNTHETIC
+        ]
     )
     return prospects, outcomes
 
@@ -157,8 +164,14 @@ def test_persist_scores_writes_table(synthetic_data) -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         for _, row in prospects.iterrows():
-            s.add(Player(name=row["name"], draft_year=int(row["draft_year"]),
-                         draft_pick=int(row["draft_pick"]), br_slug=row["br_slug"]))
+            s.add(
+                Player(
+                    name=row["name"],
+                    draft_year=int(row["draft_year"]),
+                    draft_pick=int(row["draft_pick"]),
+                    br_slug=row["br_slug"],
+                )
+            )
         s.commit()
         n = score.persist_scores(s, df, model_version="prism_test")
         s.commit()
@@ -186,8 +199,14 @@ def test_persist_scores_multi_version_coexistence(synthetic_data) -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         for _, row in prospects.iterrows():
-            s.add(Player(name=row["name"], draft_year=int(row["draft_year"]),
-                         draft_pick=int(row["draft_pick"]), br_slug=row["br_slug"]))
+            s.add(
+                Player(
+                    name=row["name"],
+                    draft_year=int(row["draft_year"]),
+                    draft_pick=int(row["draft_pick"]),
+                    br_slug=row["br_slug"],
+                )
+            )
         s.commit()
         score.persist_scores(s, df, model_version="prism_v1")
         s.commit()

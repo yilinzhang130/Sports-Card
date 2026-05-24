@@ -7,10 +7,10 @@ scrape responsibly into a flat CSV, then import here.
 Expected CSV columns (case-insensitive):
     house, lot_title, sold_at, price, currency (optional), cert_number (optional)
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -37,16 +37,20 @@ def import_auction_csv(path: str | Path, house: str) -> int:
             sold_at = pd.to_datetime(row["sold_at"], utc=True).to_pydatetime()
             price = Decimal(str(row["price"]))
             external_id = f"{house}:{row.get('lot_id', f'{sold_at.isoformat()}:{price}')}"
-            stmt = pg_insert(TxRaw).values(
-                source=house,
-                raw_title=str(row.get("lot_title", "")),
-                raw_price=price,
-                raw_currency=str(row.get("currency", "USD")),
-                sold_at=sold_at,
-                external_id=external_id,
-                raw_json=row.dropna().to_dict(),
-            ).on_conflict_do_nothing(constraint="uq_tx_raw_source_extid")
+            stmt = (
+                pg_insert(TxRaw)
+                .values(
+                    source=house,
+                    raw_title=str(row.get("lot_title", "")),
+                    raw_price=price,
+                    raw_currency=str(row.get("currency", "USD")),
+                    sold_at=sold_at,
+                    external_id=external_id,
+                    raw_json=row.dropna().to_dict(),
+                )
+                .on_conflict_do_nothing(constraint="uq_tx_raw_source_extid")
+            )
             result = s.execute(stmt)
-            added += result.rowcount or 0
+            added += result.rowcount or 0  # type: ignore[attr-defined]
     log.info("auction import (%s): %d new rows", house, added)
     return added

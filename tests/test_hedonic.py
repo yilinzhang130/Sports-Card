@@ -107,11 +107,11 @@ def trained() -> dict:
     _seed(sess)
     sess.commit()
     # Smaller noise → tighter MAE for the planted-signal recovery test.
-    generate_synthetic_transactions(sess, n_per_card=40, noise_sigma=0.1, seed=7)
+    generate_synthetic_transactions(sess, n_per_card=60, noise_sigma=0.1, seed=7)
     sess.commit()
 
     df = build_features(sess)
-    model, encoder, metrics = fit(df, n_trials=8, random_state=42)
+    model, encoder, metrics = fit(df, n_trials=12, random_state=42)
     return {
         "sess": sess,
         "df": df,

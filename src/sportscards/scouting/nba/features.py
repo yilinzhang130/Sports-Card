@@ -3,6 +3,7 @@
 Joins prospects with their 5-year NBA outcomes and produces the design matrix
 used by ``prism.train_pairwise_model``.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -49,12 +50,8 @@ def build_feature_matrix(
     # Outcomes is allowed to be missing a slug → treat as bust. Multiple rows
     # for the same slug would explode the cohort; collapse defensively.
     outcomes_unique = outcomes.drop_duplicates(subset="br_slug", keep="first")
-    merged = prospects.merge(outcomes_unique, on="br_slug", how="left").reset_index(
-        drop=True
-    )
-    merged["career_bpm_5y"] = pd.to_numeric(
-        merged["career_bpm_5y"], errors="coerce"
-    ).fillna(0.0)
+    merged = prospects.merge(outcomes_unique, on="br_slug", how="left").reset_index(drop=True)
+    merged["career_bpm_5y"] = pd.to_numeric(merged["career_bpm_5y"], errors="coerce").fillna(0.0)
 
     # Compute draft_pick *once*, with UNDRAFTED_SENTINEL imputation, and use
     # that single value to derive log_draft_pick and mock_rank. The earlier

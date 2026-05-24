@@ -8,12 +8,14 @@ columns and ignore the rest. Required: spec_id, sold_at, price, grade.
 
 A skeleton `CardLadderApiClient` is included for later enterprise-API hookup.
 """
+
 from __future__ import annotations
 
 import logging
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from sqlalchemy import select
@@ -69,15 +71,20 @@ def import_sales_csv(path: str | Path) -> tuple[int, int]:
             sold_at = pd.to_datetime(row["sold_at"], utc=True).to_pydatetime()
             price = Decimal(str(row["price"]))
 
-            raw_stmt = pg_insert(TxRaw).values(
-                source="cardladder",
-                raw_title=str(row.get("title", "")),
-                raw_price=price,
-                raw_currency="USD",
-                sold_at=sold_at,
-                external_id=external_id,
-                raw_json=row.dropna().to_dict(),
-            ).on_conflict_do_nothing(constraint="uq_tx_raw_source_extid").returning(TxRaw.raw_id)
+            raw_stmt = (
+                pg_insert(TxRaw)
+                .values(
+                    source="cardladder",
+                    raw_title=str(row.get("title", "")),
+                    raw_price=price,
+                    raw_currency="USD",
+                    sold_at=sold_at,
+                    external_id=external_id,
+                    raw_json=row.dropna().to_dict(),
+                )
+                .on_conflict_do_nothing(constraint="uq_tx_raw_source_extid")
+                .returning(TxRaw.raw_id)
+            )
             result = s.execute(raw_stmt).scalar_one_or_none()
             if result is None:
                 continue
@@ -86,17 +93,25 @@ def import_sales_csv(path: str | Path) -> tuple[int, int]:
             card_id = spec_to_card.get(spec_id)
             grade_val = row.get("grade")
             grade = Decimal(str(grade_val)) if pd.notna(grade_val) else None
-            clean_stmt = pg_insert(TxClean).values(
-                raw_id=result,
-                card_id=card_id,
-                slab_grader=str(row.get("grader", "PSA")) if pd.notna(row.get("grader")) else None,
-                slab_grade=grade,
-                cert_number=str(row.get("cert_number")) if pd.notna(row.get("cert_number")) else None,
-                price_usd=price,
-                sold_at=sold_at,
-                parser_confidence=Decimal("1.000"),
-                parser_method="cardladder",
-            ).on_conflict_do_nothing(index_elements=["raw_id"])
+            clean_stmt = (
+                pg_insert(TxClean)
+                .values(
+                    raw_id=result,
+                    card_id=card_id,
+                    slab_grader=str(row.get("grader", "PSA"))
+                    if pd.notna(row.get("grader"))
+                    else None,
+                    slab_grade=grade,
+                    cert_number=str(row.get("cert_number"))
+                    if pd.notna(row.get("cert_number"))
+                    else None,
+                    price_usd=price,
+                    sold_at=sold_at,
+                    parser_confidence=Decimal("1.000"),
+                    parser_method="cardladder",
+                )
+                .on_conflict_do_nothing(index_elements=["raw_id"])
+            )
             s.execute(clean_stmt)
             clean_added += 1
     log.info("Card Ladder import: %d raw, %d clean from %s", raw_added, clean_added, path)
@@ -116,8 +131,8 @@ class CardLadderApiClient:
         self.api_key = api_key
         raise NotImplementedError("Enterprise API access not yet provisioned")
 
-    def fetch_sales(self, spec_id: str, since: datetime) -> list[dict]:
+    def fetch_sales(self, spec_id: str, since: datetime) -> list[dict[str, Any]]:
         raise NotImplementedError
 
-    def fetch_pop(self, spec_id: str) -> list[dict]:
+    def fetch_pop(self, spec_id: str) -> list[dict[str, Any]]:
         raise NotImplementedError

@@ -8,13 +8,14 @@ Real network calls go through ``BRefClient`` and are gated behind the
 ``sportscards scouting ingest-nba`` CLI command. Tests inject a fake client
 so the unit suite never touches the network.
 """
+
 from __future__ import annotations
 
 import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -96,12 +97,10 @@ class LiveBRefClient:
         if "pk" in df.columns and "draft_pick" not in df.columns:
             df["draft_pick"] = pd.to_numeric(df["pk"], errors="coerce")
         df["draft_year"] = year
-        return df
+        return cast(pd.DataFrame, df)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
-    def get_player_career_advanced(
-        self, name: str, max_seasons: int = 5
-    ) -> pd.DataFrame:
+    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
         """`basketball_reference_scraper.players.get_stats` expects a *player
         name* (e.g. "Luka Doncic"), not a BR slug. The ingester is responsible
         for passing the name column, not the slug.
@@ -113,7 +112,7 @@ class LiveBRefClient:
         time.sleep(self.sleep_s)
         df = get_stats(name, stat_type="ADVANCED", playoffs=False, career=False)
         df = df.rename(columns=str.upper).head(max_seasons)
-        return df
+        return cast(pd.DataFrame, df)
 
 
 def ingest_year(
@@ -147,8 +146,10 @@ def ingest_year(
             continue
         outcomes.append(_aggregate_outcome(slug, adv))
 
-    outcomes_df = pd.DataFrame(outcomes, columns=OUTCOME_COLUMNS) if outcomes else pd.DataFrame(
-        columns=OUTCOME_COLUMNS
+    outcomes_df = (
+        pd.DataFrame(outcomes, columns=OUTCOME_COLUMNS)
+        if outcomes
+        else pd.DataFrame(columns=OUTCOME_COLUMNS)
     )
     outcomes_path = cache_dir / f"nba_outcomes_{year}.parquet"
     outcomes_df.to_parquet(outcomes_path, index=False)
@@ -157,9 +158,7 @@ def ingest_year(
     return prospects_path, outcomes_path
 
 
-def load_cohort(
-    years: range, cache_dir: Path = CACHE_DIR
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_cohort(years: range, cache_dir: Path = CACHE_DIR) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Read previously-cached Parquet artifacts for the given draft years."""
     prospects = pd.concat(
         [pd.read_parquet(cache_dir / f"prospects_{y}.parquet") for y in years],

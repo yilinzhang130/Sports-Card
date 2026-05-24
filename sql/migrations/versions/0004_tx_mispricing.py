@@ -1,20 +1,19 @@
 """tx_mispricing table for hedonic model residuals
 
-Revision ID: 0003
-Revises: 0002
-Create Date: 2026-05-24
+Revision ID: 0004
+Revises: 0003
+Create Date: 2026-05-25
 
-Chained after 0002 (player_stardom_score, from Phase 3) which landed on main
-before this branch. Phase 2A (repeat-sales) is still on a separate branch and
-will need its own renumber when it merges.
+Chained after 0003_repeat_sales_index (Phase 2A) which landed on main while
+this branch was open; 0002 is player_stardom_score (Phase 3).
 """
 from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0003"
-down_revision: str | None = "0002"
+revision: str = "0004"
+down_revision: str | None = "0003"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

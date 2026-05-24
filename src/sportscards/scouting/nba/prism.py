@@ -3,10 +3,12 @@
 Pairwise framing avoids the "regress-to-the-training-mean" failure of
 absolute-target gradient boosting on long-tail outcomes (Luka, Jokic).
 """
+
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -27,7 +29,7 @@ def train_pairwise_model(
     train_years: range = TRAIN_YEARS,
     valid_years: range = VALID_YEARS,
     iterations: int = 500,
-):
+) -> Any:
     """Fit a CatBoost ranker with ``PairLogit`` loss, group_id = draft_year.
 
     Splits by ``groups``: 2010-2022 train, 2023-2024 holdout. If the holdout
@@ -72,18 +74,18 @@ def train_pairwise_model(
     return model
 
 
-def predict_scores(model, X: pd.DataFrame) -> np.ndarray:
+def predict_scores(model: Any, X: pd.DataFrame) -> np.ndarray:
     return np.asarray(model.predict(X.values))
 
 
-def save_model(model, path: Path = MODEL_PATH) -> Path:
+def save_model(model: Any, path: Path = MODEL_PATH) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     model.save_model(str(path))
     logger.info("saved model → %s", path)
     return path
 
 
-def load_model(path: Path = MODEL_PATH):
+def load_model(path: Path = MODEL_PATH) -> Any:
     from catboost import CatBoostRanker
 
     model = CatBoostRanker()

@@ -1,4 +1,5 @@
 """sportscards CLI."""
+
 from __future__ import annotations
 
 import logging
@@ -72,7 +73,9 @@ def auction() -> None:
 
 @auction.command("import")
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--house", required=True, type=click.Choice(["goldin", "heritage", "fanatics_collect"]))
+@click.option(
+    "--house", required=True, type=click.Choice(["goldin", "heritage", "fanatics_collect"])
+)
 def auction_import_cmd(path: str, house: str) -> None:
     from sportscards.ingest.auction_import import import_auction_csv
 
@@ -130,9 +133,15 @@ def psa_template_cmd() -> None:
     with session_scope() as s:
         rows = s.execute(
             select(
-                Card.card_id, Card.year, Card.set_name, Card.parallel,
-                Card.card_number, Player.name,
-            ).join(Player).order_by(Card.year.desc(), Card.set_name)
+                Card.card_id,
+                Card.year,
+                Card.set_name,
+                Card.parallel,
+                Card.card_number,
+                Player.name,
+            )
+            .join(Player)
+            .order_by(Card.year.desc(), Card.set_name)
         ).all()
 
     click.echo("# Daily PSA pop snapshot priority queue.")
@@ -140,7 +149,7 @@ def psa_template_cmd() -> None:
     click.echo("# Then pull SpecID from the response.")
     for r in rows:
         comment = f"{r.year} {r.set_name} {r.parallel} #{r.card_number} {r.name}"
-        click.echo(f"- {{card_id: {r.card_id}, psa_spec_id: \"TBD\"}}  # {comment}")
+        click.echo(f'- {{card_id: {r.card_id}, psa_spec_id: "TBD"}}  # {comment}')
 
 
 @psa.command("map")
@@ -160,6 +169,26 @@ def psa_map_cmd(card_id: int, spec_id: str) -> None:
     data.append({"card_id": card_id, "psa_spec_id": spec_id})
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     click.echo(f"mapped card_id={card_id} → spec_id={spec_id}")
+
+
+@cli.command("deploy")
+def deploy_cmd() -> None:
+    """Apply Prefect deployments defined in prefect.yaml."""
+    import subprocess
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    prefect_file = repo_root / "prefect.yaml"
+    if not prefect_file.exists():
+        raise click.ClickException(
+            f"prefect.yaml not found at {prefect_file}. "
+            "Run `sportscards deploy` from a source checkout."
+        )
+    subprocess.run(
+        ["prefect", "deploy", "--prefect-file", str(prefect_file), "--all"],
+        cwd=repo_root,
+        check=True,
+    )
 
 
 @cli.group()
@@ -309,6 +338,57 @@ def scouting_score_cmd(draft_year: int | None) -> None:
     with session_scope() as s:
         n = persist_scores(s, df)
     click.echo(f"persisted {n} stardom scores ({len(df)} prospects scored)")
+
+
+@cli.group()
+def index() -> None:
+    """Repeat-sales index construction."""
+
+
+@index.command("build")
+@click.option("--bucket", default="weekly", type=click.Choice(["weekly", "monthly"]))
+@click.option(
+    "--grade-tier", "grade_tiers", multiple=True,
+    type=click.Choice(["PSA10", "PSA9", "PSA8", "lower", "all"]),
+    help="Restrict to one or more grade tiers (default: all four).",
+)
+@click.option(
+    "--era", "eras", multiple=True,
+    type=click.Choice(["modern", "vintage", "all"]),
+    help="Restrict to one or more eras (default: modern + vintage).",
+)
+@click.option("--sport", default="NBA")
+@click.option("--replace", is_flag=True, help="Delete prior rows for the same partition first.")
+def index_build_cmd(
+    bucket: str,
+    grade_tiers: tuple[str, ...],
+    eras: tuple[str, ...],
+    sport: str,
+    replace: bool,
+) -> None:
+    from sportscards.factors.index_build import build_and_persist
+
+    tiers = list(grade_tiers) or ["PSA10", "PSA9", "PSA8", "lower"]
+    era_list = list(eras) or ["modern", "vintage"]
+    stats = build_and_persist(
+        sport=sport, bucket=bucket, grade_tiers=tiers, eras=era_list, replace=replace,
+    )
+    for key, n in stats.items():
+        click.echo(f"{key}: {n} rows")
+
+
+@index.command("seed-synthetic")
+@click.option("--certs", default=2000, type=int)
+@click.option("--weeks", default=300, type=int)
+@click.option("--seed", default=42, type=int)
+@click.option("--card-id", default=1, type=int,
+              help="card_master.card_id to attach all synthetic tx to.")
+def index_seed_synthetic_cmd(certs: int, weeks: int, seed: int, card_id: int) -> None:
+    """Seed tx_raw + tx_clean with synthetic cert-tagged repeat sales for local dev."""
+    from sportscards.factors.index_build import seed_synthetic_tx
+
+    n = seed_synthetic_tx(n_certs=certs, weeks=weeks, seed=seed, card_id=card_id)
+    click.echo(f"seeded {n} synthetic tx_clean rows")
 
 
 def main() -> None:
