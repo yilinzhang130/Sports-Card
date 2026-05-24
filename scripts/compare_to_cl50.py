@@ -15,6 +15,7 @@ The CL50 CSV is expected to have at least two columns:
     date  — anything pd.to_datetime can parse
     value — CL50 level
 """
+
 from __future__ import annotations
 
 import argparse
@@ -38,30 +39,34 @@ def _load_cl50(path: Path) -> pd.DataFrame:
     if not {"date", "value"}.issubset(df.columns):
         raise ValueError("CL50 CSV must have 'date' and 'value' columns")
     df["period_start"] = _weekly_monday(df["date"])
-    return df.groupby("period_start", as_index=False)["value"].mean().rename(
-        columns={"value": "cl50"}
+    return (
+        df.groupby("period_start", as_index=False)["value"].mean().rename(columns={"value": "cl50"})
     )
 
 
-def _load_ours(
-    sport: str, bucket: str, grade_tier: str, era: str
-) -> pd.DataFrame:
+def _load_ours(sport: str, bucket: str, grade_tier: str, era: str) -> pd.DataFrame:
     with session_scope() as s:
         rows = s.execute(
             select(
-                RepeatSalesIndex.period_start, RepeatSalesIndex.index_value,
+                RepeatSalesIndex.period_start,
+                RepeatSalesIndex.index_value,
                 RepeatSalesIndex.n_pairs,
-            ).where(
+            )
+            .where(
                 RepeatSalesIndex.sport == sport,
                 RepeatSalesIndex.bucket == bucket,
                 RepeatSalesIndex.grade_tier == grade_tier,
                 RepeatSalesIndex.era == era,
-            ).order_by(RepeatSalesIndex.period_start)
+            )
+            .order_by(RepeatSalesIndex.period_start)
         ).all()
     return pd.DataFrame(
         [
-            {"period_start": r.period_start, "ours": float(r.index_value)
-             if r.index_value is not None else np.nan, "n_pairs": r.n_pairs}
+            {
+                "period_start": r.period_start,
+                "ours": float(r.index_value) if r.index_value is not None else np.nan,
+                "n_pairs": r.n_pairs,
+            }
             for r in rows
         ]
     )
@@ -97,9 +102,7 @@ def main() -> None:
     cl50 = _load_cl50(args.cl50)
     ours = _load_ours(args.sport, args.bucket, args.grade_tier, args.era)
 
-    merged = ours.merge(cl50, on="period_start", how="inner").dropna(
-        subset=["ours", "cl50"]
-    )
+    merged = ours.merge(cl50, on="period_start", how="inner").dropna(subset=["ours", "cl50"])
     if len(merged) < 4:
         raise SystemExit(f"only {len(merged)} overlapping periods; nothing to compare")
 
@@ -107,8 +110,7 @@ def main() -> None:
     log_cl50 = np.log(merged["cl50"].to_numpy())
     ret_ours = np.diff(log_ours)
     ret_cl50 = np.diff(log_cl50)
-    level_corr = float(np.corrcoef(log_ours - log_ours.mean(),
-                                   log_cl50 - log_cl50.mean())[0, 1])
+    level_corr = float(np.corrcoef(log_ours - log_ours.mean(), log_cl50 - log_cl50.mean())[0, 1])
     return_corr = float(np.corrcoef(ret_ours, ret_cl50)[0, 1])
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -117,8 +119,8 @@ def main() -> None:
 
 - Sport: **{args.sport}**, era: **{args.era}**, \
 grade: **{args.grade_tier}**, bucket: **{args.bucket}**
-- Overlap window: {merged['period_start'].min().date()} → \
-{merged['period_start'].max().date()} ({len(merged)} buckets)
+- Overlap window: {merged["period_start"].min().date()} → \
+{merged["period_start"].max().date()} ({len(merged)} buckets)
 
 ## Correlations
 
@@ -130,13 +132,13 @@ grade: **{args.grade_tier}**, bucket: **{args.bucket}**
 ## Index level — ours
 
 ```
-{_ascii_plot(merged['ours'])}
+{_ascii_plot(merged["ours"])}
 ```
 
 ## Index level — CL50
 
 ```
-{_ascii_plot(merged['cl50'])}
+{_ascii_plot(merged["cl50"])}
 ```
 
 > CL50 is a price-averaged basket with rotating constituents (selection bias).

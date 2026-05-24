@@ -4,6 +4,7 @@ Every query checks that its source table exists and raises
 `TableMissing` if not, so the dashboard/letter can render a
 placeholder instead of crashing.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -35,22 +36,19 @@ def _engine(engine: Engine | None) -> Engine:
 
 # --- Market overview (Phase 2A) ------------------------------------------------
 
+
 def repeat_sales_index(engine: Engine | None = None) -> pd.DataFrame:
     """Time series of the repeat-sales index. Columns: as_of, sleeve, index_value."""
     eng = _engine(engine)
     _require(eng, "repeat_sales_index", "Phase 2A")
-    sql = text(
-        "SELECT as_of, sleeve, index_value "
-        "FROM repeat_sales_index ORDER BY as_of"
-    )
+    sql = text("SELECT as_of, sleeve, index_value FROM repeat_sales_index ORDER BY as_of")
     return pd.read_sql(sql, eng)
 
 
 # --- Mispricing leaderboard (Phase 2B) -----------------------------------------
 
-def mispricing_leaderboard(
-    engine: Engine | None = None, n: int = 20
-) -> dict[str, pd.DataFrame]:
+
+def mispricing_leaderboard(engine: Engine | None = None, n: int = 20) -> dict[str, pd.DataFrame]:
     """Top-N undervalued (positive residual) and overvalued (negative)."""
     eng = _engine(engine)
     _require(eng, "tx_mispricing", "Phase 2B")
@@ -62,20 +60,15 @@ def mispricing_leaderboard(
         "JOIN card_master c ON c.card_id = t.card_id "
         "JOIN player_master p ON p.player_id = c.player_id "
     )
-    under = pd.read_sql(
-        text(base + "ORDER BY m.residual DESC LIMIT :n"), eng, params={"n": n}
-    )
-    over = pd.read_sql(
-        text(base + "ORDER BY m.residual ASC LIMIT :n"), eng, params={"n": n}
-    )
+    under = pd.read_sql(text(base + "ORDER BY m.residual DESC LIMIT :n"), eng, params={"n": n})
+    over = pd.read_sql(text(base + "ORDER BY m.residual ASC LIMIT :n"), eng, params={"n": n})
     return {"undervalued": under, "overvalued": over}
 
 
 # --- Prospect board (Phase 3 — already shipped) --------------------------------
 
-def stardom_scores(
-    engine: Engine | None = None, draft_year: int | None = None
-) -> pd.DataFrame:
+
+def stardom_scores(engine: Engine | None = None, draft_year: int | None = None) -> pd.DataFrame:
     eng = _engine(engine)
     _require(eng, "player_stardom_score", "Phase 3")
     sql = (
@@ -91,9 +84,7 @@ def stardom_scores(
     return pd.read_sql(text(sql), eng, params=params)
 
 
-def player_price_history(
-    player_id: int, engine: Engine | None = None
-) -> pd.DataFrame:
+def player_price_history(player_id: int, engine: Engine | None = None) -> pd.DataFrame:
     eng = _engine(engine)
     _require(eng, "tx_clean", "Phase 1")
     sql = text(
@@ -106,6 +97,7 @@ def player_price_history(
 
 
 # --- Portfolio (Phase 4) -------------------------------------------------------
+
 
 def backtest_nav(engine: Engine | None = None) -> pd.DataFrame:
     eng = _engine(engine)
@@ -120,6 +112,7 @@ def backtest_nav(engine: Engine | None = None) -> pd.DataFrame:
 
 # --- Data health (Phase 1 — always available) ----------------------------------
 
+
 def data_health(engine: Engine | None = None) -> dict[str, pd.DataFrame]:
     eng = _engine(engine)
     _require(eng, "tx_raw", "Phase 1")
@@ -133,13 +126,12 @@ def data_health(engine: Engine | None = None) -> dict[str, pd.DataFrame]:
         ),
         eng,
     )
-    failures = pd.read_sql(
-        text("SELECT COUNT(*) AS n FROM parse_failures"), eng
-    )
+    failures = pd.read_sql(text("SELECT COUNT(*) AS n FROM parse_failures"), eng)
     return {"raw_vs_clean": raw_vs_clean, "failures": failures}
 
 
 # --- Letter metrics bundle -----------------------------------------------------
+
 
 @dataclass
 class LetterMetrics:
@@ -151,9 +143,7 @@ class LetterMetrics:
     sleeve_allocation: pd.DataFrame | None
 
 
-def collect_letter_metrics(
-    month: str, engine: Engine | None = None
-) -> LetterMetrics:
+def collect_letter_metrics(month: str, engine: Engine | None = None) -> LetterMetrics:
     """Best-effort metric collection — any missing table becomes a None field."""
     eng = _engine(engine)
 
@@ -185,10 +175,7 @@ def collect_letter_metrics(
 def _compute_index_returns(engine: Engine, month: str) -> dict[str, float]:
     _require(engine, "repeat_sales_index", "Phase 2A")
     df = pd.read_sql(
-        text(
-            "SELECT as_of, index_value FROM repeat_sales_index "
-            "WHERE sleeve='ALL' ORDER BY as_of"
-        ),
+        text("SELECT as_of, index_value FROM repeat_sales_index WHERE sleeve='ALL' ORDER BY as_of"),
         engine,
     )
     if df.empty:
@@ -240,9 +227,6 @@ def _fee_drag_ytd(engine: Engine, month: str) -> float:
 def _sleeve_allocation(engine: Engine) -> pd.DataFrame:
     _require(engine, "backtest_runs", "Phase 4")
     return pd.read_sql(
-        text(
-            "SELECT sleeve, target_weight, current_weight "
-            "FROM backtest_runs_latest_alloc"
-        ),
+        text("SELECT sleeve, target_weight, current_weight FROM backtest_runs_latest_alloc"),
         engine,
     )

@@ -2,6 +2,7 @@
 
 Run with: `streamlit run reports/dashboard.py` or `sportscards dashboard`.
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -57,7 +58,10 @@ def _market_tab() -> None:
         st.write("No index data yet.")
         return
     fig = px.line(
-        df, x="as_of", y="index_value", color="sleeve",
+        df,
+        x="as_of",
+        y="index_value",
+        color="sleeve",
         title="Repeat-Sales Index",
     )
     st.plotly_chart(fig, use_container_width=True)
@@ -97,7 +101,9 @@ def _prospect_tab() -> None:
             return
         if not prices.empty:
             fig = px.line(
-                prices, x="sold_at", y="price_usd",
+                prices,
+                x="sold_at",
+                y="price_usd",
                 title=f"{chosen} — recent sales",
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -134,9 +140,7 @@ def _health_tab() -> None:
 def render_dashboard() -> None:
     st.set_page_config(page_title="sportscards-quant", layout="wide")
     st.title("sportscards-quant")
-    tabs = st.tabs(
-        ["Market", "Mispricing", "Prospects", "Portfolio", "Data Health"]
-    )
+    tabs = st.tabs(["Market", "Mispricing", "Prospects", "Portfolio", "Data Health"])
     with tabs[0]:
         _market_tab()
     with tabs[1]:

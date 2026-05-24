@@ -1,4 +1,5 @@
 """Render the monthly investor letter from a Jinja template."""
+
 from __future__ import annotations
 
 from pathlib import Path

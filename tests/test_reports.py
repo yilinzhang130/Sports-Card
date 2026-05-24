@@ -1,4 +1,5 @@
 """Tests for the reporting layer."""
+
 from __future__ import annotations
 
 import importlib
@@ -27,8 +28,15 @@ def test_table_missing_is_raised_when_table_absent():
 def test_render_monthly_letter_with_mocked_metrics(tmp_path, monkeypatch):
     """Renderer fills in tables and writes letters/YYYY-MM.md."""
     top = pd.DataFrame(
-        [{"player": "LeBron James", "year": 2003, "set_name": "Topps Chrome",
-          "parallel": "Refractor", "residual": 412.5}]
+        [
+            {
+                "player": "LeBron James",
+                "year": 2003,
+                "set_name": "Topps Chrome",
+                "parallel": "Refractor",
+                "residual": 412.5,
+            }
+        ]
     )
     sleeves = pd.DataFrame(
         [{"sleeve": "Modern PSA10", "target_weight": 0.6, "current_weight": 0.55}]
@@ -41,9 +49,7 @@ def test_render_monthly_letter_with_mocked_metrics(tmp_path, monkeypatch):
         fee_drag_ytd=0.087,
         sleeve_allocation=sleeves,
     )
-    monkeypatch.setattr(
-        render, "collect_letter_metrics", lambda month, engine=None: fake_metrics
-    )
+    monkeypatch.setattr(render, "collect_letter_metrics", lambda month, engine=None: fake_metrics)
 
     out = render.render_monthly_letter("2024-12", out_dir=tmp_path)
     body = Path(out).read_text()
@@ -58,12 +64,14 @@ def test_render_monthly_letter_with_mocked_metrics(tmp_path, monkeypatch):
 def test_render_monthly_letter_is_idempotent(tmp_path, monkeypatch):
     """Re-rendering the same month overwrites the file without error."""
     metrics = render.LetterMetrics(
-        month="2024-12", index_returns=None, top_mispricings=None,
-        rebalance_trades=None, fee_drag_ytd=None, sleeve_allocation=None,
+        month="2024-12",
+        index_returns=None,
+        top_mispricings=None,
+        rebalance_trades=None,
+        fee_drag_ytd=None,
+        sleeve_allocation=None,
     )
-    monkeypatch.setattr(
-        render, "collect_letter_metrics", lambda month, engine=None: metrics
-    )
+    monkeypatch.setattr(render, "collect_letter_metrics", lambda month, engine=None: metrics)
     p1 = render.render_monthly_letter("2024-12", out_dir=tmp_path)
     p2 = render.render_monthly_letter("2024-12", out_dir=tmp_path)
     assert p1 == p2
