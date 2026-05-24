@@ -162,6 +162,9 @@ def collect_letter_metrics(
             return fn()
         except TableMissing:
             return None
+        except Exception:
+            # Schema drift on an in-progress Phase 2+ table — degrade gracefully.
+            return None
 
     index_returns = _try(lambda: _compute_index_returns(eng, month))
     top_mis = _try(lambda: mispricing_leaderboard(eng, n=5)["undervalued"])
