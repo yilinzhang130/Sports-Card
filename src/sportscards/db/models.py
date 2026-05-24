@@ -132,3 +132,27 @@ class PopSnapshot(Base):
     grader: Mapped[str] = mapped_column(String(8), primary_key=True)
     grade: Mapped[Decimal] = mapped_column(Numeric(4, 1), primary_key=True)
     pop_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class RepeatSalesIndex(Base):
+    """Cert-based repeat-sales index. TimescaleDB hypertable on period_start.
+
+    One row per (period_start, sport, bucket, grade_tier, era).
+    """
+
+    __tablename__ = "repeat_sales_index"
+
+    period_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), primary_key=True
+    )
+    sport: Mapped[str] = mapped_column(String(8), primary_key=True)
+    bucket: Mapped[str] = mapped_column(String(8), primary_key=True)
+    grade_tier: Mapped[str] = mapped_column(String(8), primary_key=True)
+    era: Mapped[str] = mapped_column(String(8), primary_key=True)
+    index_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    n_pairs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    se: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+
+    __table_args__ = (
+        Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),
+    )
