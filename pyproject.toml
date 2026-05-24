@@ -23,6 +23,17 @@ dependencies = [
     "optuna>=3.6",
     "joblib>=1.4",
     "scikit-learn>=1.5",
+    "catboost>=1.2",
+    "pyarrow>=17.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+scouting-live = [
+    # Pulled only for the live NBA ingest path. The library is known to break
+    # when Basketball-Reference's HTML changes; tests inject a fake client so
+    # the test suite does not require this dep.
+    "basketball-reference-scraper>=1.0.6",
 ]
 
 [project.scripts]
