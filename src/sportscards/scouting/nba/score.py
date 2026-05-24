@@ -12,11 +12,14 @@ modelling can read it as "edge over the priced-in prior."
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
@@ -33,15 +36,20 @@ def compute_stardom_premium(
     """Within each draft class, percentile-rank the model score and subtract
     the draft-slot prior (lower pick ⇒ higher prior).
     """
+    # All inputs forced to positional ndarrays so a mismatched Series index
+    # cannot silently re-align columns under us. Length mismatch raises.
     df = pd.DataFrame(
         {
-            "br_slug": br_slugs.values,
-            "draft_year": pd.to_numeric(draft_years, errors="coerce").astype("Int64"),
-            "draft_pick": pd.to_numeric(draft_picks, errors="coerce"),
-            "model_score": model_scores,
+            "br_slug": np.asarray(br_slugs),
+            "draft_year": pd.to_numeric(np.asarray(draft_years), errors="coerce"),
+            "draft_pick": pd.to_numeric(np.asarray(draft_picks), errors="coerce"),
+            "model_score": np.asarray(model_scores),
         }
     )
-    df["draft_pick"] = df["draft_pick"].fillna(df["draft_pick"].max() or 60)
+    max_pick = df["draft_pick"].max()
+    if not np.isfinite(max_pick):
+        max_pick = 60.0
+    df["draft_pick"] = df["draft_pick"].fillna(max_pick)
 
     df["percentile_rank"] = df.groupby("draft_year")["model_score"].rank(
         pct=True, method="average"
@@ -82,9 +90,15 @@ def persist_scores(
         )
 
     n = 0
+    skipped_unmapped = 0
+    skipped_bad_year = 0
     for row in scores.itertuples(index=False):
         pid = slug_to_id.get(row.br_slug)
         if pid is None:
+            skipped_unmapped += 1
+            continue
+        if not pd.notna(row.draft_year):
+            skipped_bad_year += 1
             continue
         session.add(
             PlayerStardomScore(
@@ -97,4 +111,10 @@ def persist_scores(
             )
         )
         n += 1
+    if skipped_unmapped or skipped_bad_year:
+        logger.warning(
+            "persist_scores skipped %d unmapped slugs, %d rows with missing draft_year",
+            skipped_unmapped,
+            skipped_bad_year,
+        )
     return n

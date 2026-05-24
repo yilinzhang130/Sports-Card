@@ -2993,7 +2993,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
-    { name = "basketball-reference-scraper" },
     { name = "catboost" },
     { name = "click" },
     { name = "httpx" },
@@ -3013,6 +3012,11 @@ dependencies = [
     { name = "tenacity" },
 ]
 
+[package.optional-dependencies]
+scouting-live = [
+    { name = "basketball-reference-scraper" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "mypy" },
@@ -3025,7 +3029,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
-    { name = "basketball-reference-scraper", specifier = ">=1.0.6" },
+    { name = "basketball-reference-scraper", marker = "extra == 'scouting-live'", specifier = ">=1.0.6" },
     { name = "catboost", specifier = ">=1.2" },
     { name = "click", specifier = ">=8.1" },
     { name = "httpx", specifier = ">=0.27" },
@@ -3044,6 +3048,7 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "tenacity", specifier = ">=9.0" },
 ]
+provides-extras = ["scouting-live"]
 
 [package.metadata.requires-dev]
 dev = [

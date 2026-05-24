@@ -130,8 +130,8 @@ class PlayerStardomScore(Base):
     player_id: Mapped[int] = mapped_column(
         ForeignKey("player_master.player_id"), primary_key=True
     )
+    model_version: Mapped[str] = mapped_column(String(32), primary_key=True)
     draft_year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
-    model_version: Mapped[str] = mapped_column(String(32), nullable=False)
     premium: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
     percentile_rank: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
     fit_at: Mapped[datetime] = mapped_column(

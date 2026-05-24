@@ -80,8 +80,12 @@ class FakeBRefClient:
     def get_draft_class(self, year: int) -> pd.DataFrame:
         return self._prospects[self._prospects["draft_year"] == year].copy()
 
-    def get_player_career_advanced(self, br_slug: str, max_seasons: int = 5) -> pd.DataFrame:
-        bpm = float(self._outcomes.loc[self._outcomes["br_slug"] == br_slug, "career_bpm_5y"].iloc[0])
+    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
+        slug_for_name = self._prospects.loc[self._prospects["name"] == name, "br_slug"]
+        if slug_for_name.empty:
+            raise KeyError(name)
+        slug = slug_for_name.iloc[0]
+        bpm = float(self._outcomes.loc[self._outcomes["br_slug"] == slug, "career_bpm_5y"].iloc[0])
         return pd.DataFrame({"BPM": [bpm], "WS": [bpm * 2], "VORP": [bpm / 3]})
 
 
@@ -162,3 +166,35 @@ def test_persist_scores_writes_table(synthetic_data) -> None:
 
     assert n == len(prospects)
     assert len(stored) == len(prospects)
+
+
+def test_persist_scores_multi_version_coexistence(synthetic_data) -> None:
+    """Two model_versions for the same player must coexist — the PK is
+    (player_id, model_version), not player_id alone."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from sportscards.db.models import Base, Player, PlayerStardomScore
+
+    prospects, outcomes = synthetic_data
+    X, _, groups, slugs = feat.build_feature_matrix(prospects, outcomes)
+    model = prism.train_pairwise_model(X, _, groups, iterations=100)
+    scores = prism.predict_scores(model, X)
+    df = score.compute_stardom_premium(slugs, groups, prospects["draft_pick"], scores)
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as s:
+        for _, row in prospects.iterrows():
+            s.add(Player(name=row["name"], draft_year=int(row["draft_year"]),
+                         draft_pick=int(row["draft_pick"]), br_slug=row["br_slug"]))
+        s.commit()
+        score.persist_scores(s, df, model_version="prism_v1")
+        s.commit()
+        score.persist_scores(s, df, model_version="prism_v2")
+        s.commit()
+        rows = s.query(PlayerStardomScore).all()
+
+    assert len(rows) == 2 * len(prospects)
+    versions = {r.model_version for r in rows}
+    assert versions == {"prism_v1", "prism_v2"}
