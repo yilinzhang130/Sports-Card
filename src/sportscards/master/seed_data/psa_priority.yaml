@@ -1,0 +1,6 @@
+# Priority queue for daily PSA pop snapshots.
+# Each entry maps a card_master row to its PSA spec ID. Populate after
+# you've seeded cards and looked up spec IDs on psacard.com.
+# Format:
+# - {card_id: 1, psa_spec_id: "12345"}
+[]

@@ -1,0 +1,12 @@
+# Seed of key NBA rookie cards. Expand via manufacturer checklists.
+# Schema: list of card entries; player matched by name into player_master.
+- {year: 2018, manufacturer: Panini, set: Prizm, card_number: "280", parallel: Base, player: Luka Doncic, is_rookie: true}
+- {year: 2018, manufacturer: Panini, set: Prizm, card_number: "280", parallel: Silver, player: Luka Doncic, is_rookie: true}
+- {year: 2018, manufacturer: Panini, set: Prizm, card_number: "280", parallel: "Gold /10", print_run: 10, player: Luka Doncic, is_rookie: true}
+- {year: 2003, manufacturer: Topps, set: Topps Chrome, card_number: "111", parallel: Base, player: LeBron James, is_rookie: true}
+- {year: 2003, manufacturer: Topps, set: Topps Chrome, card_number: "111", parallel: Refractor, player: LeBron James, is_rookie: true}
+- {year: 2019, manufacturer: Panini, set: Prizm, card_number: "248", parallel: Base, player: Zion Williamson, is_rookie: true}
+- {year: 2019, manufacturer: Panini, set: Prizm, card_number: "248", parallel: Silver, player: Zion Williamson, is_rookie: true}
+- {year: 2019, manufacturer: Panini, set: Prizm, card_number: "249", parallel: Base, player: Ja Morant, is_rookie: true}
+- {year: 2017, manufacturer: Panini, set: Prizm, card_number: "12", parallel: Base, player: Jayson Tatum, is_rookie: true}
+- {year: 2023, manufacturer: Panini, set: Prizm, card_number: "1", parallel: Base, player: Victor Wembanyama, is_rookie: true}

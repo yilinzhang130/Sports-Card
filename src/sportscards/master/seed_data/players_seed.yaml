@@ -1,0 +1,50 @@
+# Seed of high-priority NBA players whose rookie cards are heavily indexed.
+# Expand via Basketball-Reference scraper later.
+- name: LeBron James
+  position: SF
+  draft_year: 2003
+  draft_pick: 1
+  team: LAL
+  br_slug: jamesle01
+- name: Luka Doncic
+  position: PG
+  draft_year: 2018
+  draft_pick: 3
+  team: LAL
+  br_slug: doncilu01
+- name: Zion Williamson
+  position: PF
+  draft_year: 2019
+  draft_pick: 1
+  team: NOP
+  br_slug: willizi01
+- name: Ja Morant
+  position: PG
+  draft_year: 2019
+  draft_pick: 2
+  team: MEM
+  br_slug: morantja01
+- name: Jayson Tatum
+  position: SF
+  draft_year: 2017
+  draft_pick: 3
+  team: BOS
+  br_slug: tatumja01
+- name: Victor Wembanyama
+  position: C
+  draft_year: 2023
+  draft_pick: 1
+  team: SAS
+  br_slug: wembavi01
+- name: Kobe Bryant
+  position: SG
+  draft_year: 1996
+  draft_pick: 13
+  team: LAL
+  br_slug: bryanko01
+- name: Michael Jordan
+  position: SG
+  draft_year: 1984
+  draft_pick: 3
+  team: CHI
+  br_slug: jordami01

@@ -1,0 +1,51 @@
+# Hand-labeled NBA card title fixtures for regex parser regression tests.
+# Production target: 100 titles, ≥95% accuracy.
+# Initial seed of well-formed titles below — expand to 100 manually before MVP gate.
+- title: "2018-19 Panini Prizm Luka Doncic #280 Silver PSA 10 Rookie RC"
+  expect:
+    year: 2018
+    manufacturer: Panini
+    set_name: Prizm
+    card_number: "280"
+    parallel: Silver
+    slab_grader: PSA
+    slab_grade: 10
+    is_rookie: true
+- title: "2003-04 Topps Chrome Refractor LeBron James #111 PSA 9"
+  expect:
+    year: 2003
+    manufacturer: Topps
+    set_name: Topps Chrome
+    card_number: "111"
+    parallel: Refractor
+    slab_grader: PSA
+    slab_grade: 9
+- title: "2019-20 Panini National Treasures Zion Williamson RPA /99 BGS 9.5"
+  expect:
+    year: 2019
+    manufacturer: Panini
+    set_name: National Treasures
+    parallel: "/99"
+    has_patch: true
+    slab_grader: BGS
+    slab_grade: 9.5
+- title: "2017-18 Panini Select Jayson Tatum #45 Silver Prizm RC PSA 10"
+  expect:
+    year: 2017
+    manufacturer: Panini
+    set_name: Select
+    card_number: "45"
+    parallel: Silver
+    slab_grader: PSA
+    slab_grade: 10
+    is_rookie: true
+- title: "2019-20 Donruss Optic Ja Morant #38 Holo Rookie PSA 10"
+  expect:
+    year: 2019
+    manufacturer: Panini
+    set_name: Donruss Optic
+    card_number: "38"
+    parallel: Holo
+    slab_grader: PSA
+    slab_grade: 10
+    is_rookie: true
