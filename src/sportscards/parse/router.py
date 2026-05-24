@@ -1,4 +1,5 @@
 """Routing logic between regex and LLM parsers."""
+
 from __future__ import annotations
 
 import logging

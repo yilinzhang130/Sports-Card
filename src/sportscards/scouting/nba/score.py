@@ -10,21 +10,22 @@ slot) is; *negative* means it is lower. Zero means the model and the consensus
 agree. Interpretation is intentionally market-relative so downstream hedonic
 modelling can read it as "edge over the priced-in prior."
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import numpy as np
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import Player, PlayerStardomScore
 from sportscards.scouting.nba.prism import MODEL_VERSION
+
+logger = logging.getLogger(__name__)
 
 
 def compute_stardom_premium(
@@ -51,13 +52,9 @@ def compute_stardom_premium(
         max_pick = 60.0
     df["draft_pick"] = df["draft_pick"].fillna(max_pick)
 
-    df["percentile_rank"] = df.groupby("draft_year")["model_score"].rank(
-        pct=True, method="average"
-    )
+    df["percentile_rank"] = df.groupby("draft_year")["model_score"].rank(pct=True, method="average")
     # Lower pick ⇒ higher prior. Use 1 - pct-rank of draft_pick.
-    df["slot_prior"] = 1.0 - df.groupby("draft_year")["draft_pick"].rank(
-        pct=True, method="average"
-    )
+    df["slot_prior"] = 1.0 - df.groupby("draft_year")["draft_pick"].rank(pct=True, method="average")
     df["premium"] = df["percentile_rank"] - df["slot_prior"]
     return df[["br_slug", "draft_year", "premium", "percentile_rank"]]
 
@@ -72,15 +69,15 @@ def persist_scores(
     Maps ``br_slug`` → ``player_id`` via ``player_master``. Rows without a
     matching player are skipped (logged caller-side if desired).
     """
-    slug_to_id = dict(
-        session.query(Player.br_slug, Player.player_id).filter(
+    slug_to_id: dict[str, int] = {
+        slug: pid
+        for slug, pid in session.query(Player.br_slug, Player.player_id).filter(
             Player.br_slug.in_(scores["br_slug"].tolist())
         )
-    )
-    now = datetime.now(timezone.utc)
-    matched_player_ids = [
-        slug_to_id[s] for s in scores["br_slug"] if s in slug_to_id
-    ]
+        if slug is not None
+    }
+    now = datetime.now(UTC)
+    matched_player_ids = [slug_to_id[s] for s in scores["br_slug"] if s in slug_to_id]
     if matched_player_ids:
         session.execute(
             delete(PlayerStardomScore).where(
@@ -93,7 +90,7 @@ def persist_scores(
     skipped_unmapped = 0
     skipped_bad_year = 0
     for row in scores.itertuples(index=False):
-        pid = slug_to_id.get(row.br_slug)
+        pid = slug_to_id.get(str(row.br_slug))
         if pid is None:
             skipped_unmapped += 1
             continue
@@ -103,7 +100,7 @@ def persist_scores(
         session.add(
             PlayerStardomScore(
                 player_id=pid,
-                draft_year=int(row.draft_year),
+                draft_year=int(float(str(row.draft_year))),
                 model_version=model_version,
                 premium=Decimal(f"{row.premium:.4f}"),
                 percentile_rank=Decimal(f"{row.percentile_rank:.4f}"),

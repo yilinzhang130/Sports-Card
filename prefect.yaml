@@ -1,0 +1,33 @@
+name: sportscards-quant
+prefect-version: 3.0.0
+
+# TODO: provision a work pool named "default-agent-pool" before applying:
+#   prefect work-pool create default-agent-pool --type process
+
+deployments:
+  - name: daily-ebay-ingest
+    entrypoint: src/sportscards/flows/daily_ebay.py:daily_ebay_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "0 3 * * *"
+        timezone: America/Los_Angeles
+        active: true
+
+  - name: daily-psa-pop
+    entrypoint: src/sportscards/flows/daily_psa_pop.py:daily_psa_pop_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "30 3 * * *"
+        timezone: America/Los_Angeles
+        active: true
+
+  - name: parse-pending
+    entrypoint: src/sportscards/flows/parse_pending.py:parse_pending_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "*/30 * * * *"
+        timezone: America/Los_Angeles
+        active: true

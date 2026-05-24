@@ -3,6 +3,7 @@
 OpenAI-compatible SDK; cheap per-call so we route all low-confidence regex
 results through this rather than dropping them.
 """
+
 from __future__ import annotations
 
 import json

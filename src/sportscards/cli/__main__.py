@@ -1,4 +1,5 @@
 """sportscards CLI."""
+
 from __future__ import annotations
 
 import logging
@@ -72,7 +73,9 @@ def auction() -> None:
 
 @auction.command("import")
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--house", required=True, type=click.Choice(["goldin", "heritage", "fanatics_collect"]))
+@click.option(
+    "--house", required=True, type=click.Choice(["goldin", "heritage", "fanatics_collect"])
+)
 def auction_import_cmd(path: str, house: str) -> None:
     from sportscards.ingest.auction_import import import_auction_csv
 
@@ -130,9 +133,15 @@ def psa_template_cmd() -> None:
     with session_scope() as s:
         rows = s.execute(
             select(
-                Card.card_id, Card.year, Card.set_name, Card.parallel,
-                Card.card_number, Player.name,
-            ).join(Player).order_by(Card.year.desc(), Card.set_name)
+                Card.card_id,
+                Card.year,
+                Card.set_name,
+                Card.parallel,
+                Card.card_number,
+                Player.name,
+            )
+            .join(Player)
+            .order_by(Card.year.desc(), Card.set_name)
         ).all()
 
     click.echo("# Daily PSA pop snapshot priority queue.")
@@ -140,7 +149,7 @@ def psa_template_cmd() -> None:
     click.echo("# Then pull SpecID from the response.")
     for r in rows:
         comment = f"{r.year} {r.set_name} {r.parallel} #{r.card_number} {r.name}"
-        click.echo(f"- {{card_id: {r.card_id}, psa_spec_id: \"TBD\"}}  # {comment}")
+        click.echo(f'- {{card_id: {r.card_id}, psa_spec_id: "TBD"}}  # {comment}')
 
 
 @psa.command("map")
@@ -160,6 +169,26 @@ def psa_map_cmd(card_id: int, spec_id: str) -> None:
     data.append({"card_id": card_id, "psa_spec_id": spec_id})
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     click.echo(f"mapped card_id={card_id} → spec_id={spec_id}")
+
+
+@cli.command("deploy")
+def deploy_cmd() -> None:
+    """Apply Prefect deployments defined in prefect.yaml."""
+    import subprocess
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    prefect_file = repo_root / "prefect.yaml"
+    if not prefect_file.exists():
+        raise click.ClickException(
+            f"prefect.yaml not found at {prefect_file}. "
+            "Run `sportscards deploy` from a source checkout."
+        )
+    subprocess.run(
+        ["prefect", "deploy", "--prefect-file", str(prefect_file), "--all"],
+        cwd=repo_root,
+        check=True,
+    )
 
 
 @cli.group()
