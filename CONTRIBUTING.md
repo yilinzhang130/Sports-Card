@@ -11,7 +11,7 @@ uv run sportscards seed cards
 ```
 
 The dev database listens on host port `5433` (mapped to container 5432). Set
-`DATABASE_URL=postgresql+psycopg://sportscards:sportscards@localhost:5433/sportscards`
+`DATABASE_URL=postgresql+psycopg://sportscards:sportscards@localhost:5433/sportscards`  <!-- pragma: allowlist secret -->
 in your `.env` (see `.env.example`).
 
 ## Running tests
@@ -67,7 +67,11 @@ Per-task plans live in the same directory.
 Schedules are defined in [`prefect.yaml`](prefect.yaml). To apply them:
 
 ```bash
-docker compose up -d prefect
-uv run prefect work-pool create default-agent-pool --type process  # one-time
+docker compose up -d prefect                                         # starts Prefect server on :4200
+export PREFECT_API_URL=http://localhost:4200/api                     # point CLI at it
+uv run prefect work-pool create default-agent-pool --type process    # one-time
 uv run sportscards deploy
 ```
+
+`sportscards deploy` resolves `prefect.yaml` relative to the repo root, so it
+can be invoked from any subdirectory of a source checkout.

@@ -50,9 +50,6 @@ def seed_cards(path: Path | None = None) -> int:
                 log.warning("seed_cards: unknown player %r, skipping", player_name)
                 continue
             row["player_id"] = player_id
-            # Map yaml `set` -> ORM column attr `set_name`
-            if "set" in row:
-                row["set"] = row["set"]  # column literal name remains "set" in DB
             stmt = (
                 pg_insert(Card)
                 .values(**row)

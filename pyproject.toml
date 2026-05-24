@@ -53,11 +53,16 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-disallow_untyped_decorators = false
 
 [[tool.mypy.overrides]]
 module = "tests.*"
 ignore_errors = true
+
+# click/prefect/tenacity decorators aren't typed; scope the relaxation to the
+# modules that actually use them so the rest of the tree stays strict.
+[[tool.mypy.overrides]]
+module = ["sportscards.cli.*", "sportscards.flows.*", "sportscards.ingest.*"]
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

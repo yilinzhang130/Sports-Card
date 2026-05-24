@@ -175,8 +175,20 @@ def psa_map_cmd(card_id: int, spec_id: str) -> None:
 def deploy_cmd() -> None:
     """Apply Prefect deployments defined in prefect.yaml."""
     import subprocess
+    from pathlib import Path
 
-    subprocess.run(["prefect", "deploy", "--all"], check=True)
+    repo_root = Path(__file__).resolve().parents[3]
+    prefect_file = repo_root / "prefect.yaml"
+    if not prefect_file.exists():
+        raise click.ClickException(
+            f"prefect.yaml not found at {prefect_file}. "
+            "Run `sportscards deploy` from a source checkout."
+        )
+    subprocess.run(
+        ["prefect", "deploy", "--prefect-file", str(prefect_file), "--all"],
+        cwd=repo_root,
+        check=True,
+    )
 
 
 def main() -> None:
