@@ -1,11 +1,15 @@
 """Tests for the reporting layer."""
 from __future__ import annotations
 
+import importlib
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
-from sportscards.reports import queries
+from sportscards.reports import queries, render
 
 
 def test_table_missing_is_raised_when_table_absent():
@@ -18,12 +22,6 @@ def test_table_missing_is_raised_when_table_absent():
 
 
 # --- Renderer tests ----------------------------------------------------------
-
-from pathlib import Path
-
-import pandas as pd
-
-from sportscards.reports import render
 
 
 def test_render_monthly_letter_with_mocked_metrics(tmp_path, monkeypatch):
@@ -70,10 +68,6 @@ def test_render_monthly_letter_is_idempotent(tmp_path, monkeypatch):
     p2 = render.render_monthly_letter("2024-12", out_dir=tmp_path)
     assert p1 == p2
     assert p1.exists()
-
-
-import importlib
-import sys
 
 
 def test_dashboard_imports_cleanly():
