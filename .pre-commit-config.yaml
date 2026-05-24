@@ -15,16 +15,17 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.13.0
+  - repo: local
     hooks:
       - id: mypy
-        files: ^src/
-        additional_dependencies:
-          - pydantic>=2.8
-          - pydantic-settings>=2.5
-          - sqlalchemy>=2.0
-          - types-pyyaml
+        name: mypy
+        # Use the project's uv-managed venv so runtime deps (httpx, prefect,
+        # click, tenacity, ...) and stub packages resolve identically to CI.
+        # Package mode (not per-file) so module-scoped overrides apply.
+        entry: uv run mypy src
+        language: system
+        pass_filenames: false
+        types: [python]
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0

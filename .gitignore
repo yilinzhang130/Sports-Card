@@ -13,6 +13,7 @@ build/
 .ipynb_checkpoints/
 .DS_Store
 data/
+.worktrees/
 *.csv
 *.parquet
 !tests/fixtures/*.csv
