@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import Card, PopSnapshot, TxClean, TxRaw
+from sportscards.factors.features import parallel_tier
 
 # Planted ground-truth coefficients. Tests import this dict and assert the
 # fitted hedonic model recovers each coefficient within tolerance.
@@ -34,34 +35,12 @@ PLANTED_COEFFS: dict[str, float] = {
 _INTERCEPT = 4.0  # exp(4.0) ≈ $55
 
 
-def _parallel_tier(card: Card) -> int:
-    """Map a card's parallel/print-run to a 0..4 scarcity tier."""
-    if card.is_one_of_one:
-        return 4
-    pr = card.print_run
-    if pr is not None:
-        if pr <= 10:
-            return 4
-        if pr <= 25:
-            return 3
-        if pr <= 99:
-            return 2
-        if pr <= 499:
-            return 1
-        return 0
-    p = (card.parallel or "Base").lower()
-    if p == "base":
-        return 0
-    if "gold" in p or "refractor" in p or "prizm" in p:
-        return 2
-    return 1
-
-
 def _pop_for_card(card: Card, grade: int, rng: random.Random) -> int:
     """Plausible PSA pop count for (card, grade) — scarcer parallels → lower pop."""
-    tier = _parallel_tier(card)
+    tier = parallel_tier(card)
     # Base pop ranges roughly by tier; PSA 10 typically rarer than PSA 9.
-    base_by_tier = {0: 8000, 1: 1500, 2: 400, 3: 80, 4: 5}
+    # Tier 5 (1-of-1) shares tier 4's base — both are extremely scarce.
+    base_by_tier = {0: 8000, 1: 1500, 2: 400, 3: 80, 4: 5, 5: 1}
     base = base_by_tier[tier]
     if grade == 10:
         base = max(1, base // 3)
@@ -103,7 +82,7 @@ def generate_synthetic_transactions(
     ext_counter = 0
 
     for card in cards:
-        tier = _parallel_tier(card)
+        tier = parallel_tier(card)
         is_rookie = 1.0 if card.is_rookie else 0.0
         has_auto = 1.0 if card.has_auto else 0.0
         has_patch = 1.0 if card.has_patch else 0.0
