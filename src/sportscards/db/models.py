@@ -121,6 +121,16 @@ class ParseFailure(Base):
     )
 
 
+class BacktestRun(Base):
+    __tablename__ = "backtest_runs"
+
+    run_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    params_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
 class PlayerStardomScore(Base):
     """Per-player stardom-premium score from the PRISM-style scouting model.
 

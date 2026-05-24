@@ -171,6 +171,135 @@ def psa_map_cmd(card_id: int, spec_id: str) -> None:
     click.echo(f"mapped card_id={card_id} → spec_id={spec_id}")
 
 
+@cli.group()
+def portfolio() -> None:
+    """Portfolio construction and risk."""
+
+
+@portfolio.command("plan")
+@click.option("--aum", type=float, default=1_000_000.0)
+def portfolio_plan_cmd(aum: float) -> None:
+    """Print current target weights (anchor-only fallback if no factor data)."""
+    import warnings as _w
+
+    import pandas as pd
+    from rich.console import Console
+    from rich.table import Table
+
+    from sportscards.db.session import session_scope
+    from sportscards.portfolio.adapters import load_anchors, load_mispricing, load_stardom
+    from sportscards.portfolio.construction import (
+        AllocationConfig,
+        UniverseSnapshot,
+        build_portfolio,
+    )
+
+    now = pd.Timestamp.utcnow()
+    with _w.catch_warnings(record=True) as caught:
+        _w.simplefilter("always")
+        with session_scope() as s:
+            anchors = load_anchors(s)
+            mispricing = load_mispricing(s, now)
+            stardom = load_stardom(s, now)
+        positions = build_portfolio(
+            UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
+            AllocationConfig(total_aum_usd=aum),
+        )
+
+    console = Console()
+    for w_ in caught:
+        console.print(f"[yellow]warning:[/yellow] {w_.message}")
+    table = Table(title=f"Target portfolio (AUM ${aum:,.0f})")
+    table.add_column("card_id", justify="right")
+    table.add_column("sleeve")
+    table.add_column("weight %", justify="right")
+    table.add_column("$ value", justify="right")
+    for p in sorted(positions, key=lambda x: (-abs(x.target_weight_pct), x.card_id)):
+        table.add_row(
+            str(p.card_id),
+            p.sleeve,
+            f"{p.target_weight_pct * 100:.2f}",
+            f"${p.target_usd_value:,.0f}",
+        )
+    console.print(table)
+    total = sum(p.target_weight_pct for p in positions)
+    console.print(f"[bold]total allocated:[/bold] {total * 100:.2f}%")
+
+
+@cli.group()
+def backtest() -> None:
+    """Walk-forward backtesting."""
+
+
+@backtest.command("run")
+@click.option("--start", required=True)
+@click.option("--end", required=True)
+@click.option("--aum", type=float, default=1_000_000.0)
+@click.option("--out", default=None, help="Output path prefix; .json and .md are written")
+def backtest_run_cmd(start: str, end: str, aum: float, out: str | None) -> None:
+    import json
+    from datetime import date as _date
+    from pathlib import Path
+
+    import pandas as pd
+
+    from sportscards.db.session import session_scope
+    from sportscards.portfolio.adapters import (
+        load_anchors,
+        load_mispricing,
+        load_price_panel,
+        load_stardom,
+    )
+    from sportscards.portfolio.backtester import BacktestConfig, run_backtest
+    from sportscards.portfolio.construction import (
+        AllocationConfig,
+        UniverseSnapshot,
+    )
+
+    start_d = _date.fromisoformat(start)
+    end_d = _date.fromisoformat(end)
+
+    with session_scope() as s:
+        anchors = load_anchors(s)
+        card_ids = anchors["card_id"].tolist() if not anchors.empty else []
+        panel = load_price_panel(s, card_ids, pd.Timestamp(start_d), pd.Timestamp(end_d))
+
+        def provider(as_of: pd.Timestamp) -> UniverseSnapshot:
+            with session_scope() as s2:
+                a = load_anchors(s2, as_of=as_of.to_pydatetime())
+                m = load_mispricing(s2, as_of.to_pydatetime())
+                p = load_stardom(s2, as_of.to_pydatetime())
+            return UniverseSnapshot(anchors_df=a, factor_df=m, prospect_df=p)
+
+        cfg = BacktestConfig(
+            start=start_d,
+            end=end_d,
+            initial_aum_usd=aum,
+            allocation=AllocationConfig(total_aum_usd=aum),
+        )
+        result = run_backtest(cfg, provider, panel)
+
+    summary_json = result.summary
+    md_lines = [
+        f"# Backtest {start} → {end}",
+        "",
+        "## Summary",
+        *[f"- **{k}**: {v}" for k, v in summary_json.items()],
+        "",
+        "## NAV (resampled monthly)",
+        result.nav.resample("ME").last().to_frame("nav").to_markdown(),
+    ]
+    md = "\n".join(md_lines)
+
+    out_path = Path(out) if out else Path(f"backtest_{start}_{end}")
+    json_path = out_path.with_suffix(".json")
+    md_path = out_path.with_suffix(".md")
+    json_path.write_text(json.dumps(summary_json, indent=2, default=str))
+    md_path.write_text(md)
+    click.echo(f"wrote {json_path} and {md_path}")
+    click.echo(json.dumps(summary_json, indent=2, default=str))
+
+
 @cli.command("deploy")
 def deploy_cmd() -> None:
     """Apply Prefect deployments defined in prefect.yaml."""
