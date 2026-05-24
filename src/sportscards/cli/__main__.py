@@ -162,6 +162,71 @@ def psa_map_cmd(card_id: int, spec_id: str) -> None:
     click.echo(f"mapped card_id={card_id} → spec_id={spec_id}")
 
 
+@cli.group()
+def scouting() -> None:
+    """NBA prospect scouting model (PRISM-style pairwise CatBoost)."""
+
+
+@scouting.command("ingest-nba")
+@click.option(
+    "--year",
+    "years",
+    multiple=True,
+    type=int,
+    help="Draft year(s) to pull. Defaults to 2010-2024.",
+)
+def scouting_ingest_nba_cmd(years: tuple[int, ...]) -> None:
+    from sportscards.scouting.nba.ingest_bref import LiveBRefClient, ingest_year
+
+    target_years = list(years) if years else list(range(2010, 2025))
+    client = LiveBRefClient()
+    for y in target_years:
+        click.echo(f"ingesting {y}…")
+        ingest_year(y, client=client)
+    click.echo(f"done ({len(target_years)} years)")
+
+
+@scouting.command("fit")
+@click.option("--start", default=2010, type=int)
+@click.option("--end", default=2024, type=int)
+def scouting_fit_cmd(start: int, end: int) -> None:
+    from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_bref import load_cohort
+    from sportscards.scouting.nba.prism import (
+        concordance,
+        predict_scores,
+        save_model,
+        train_pairwise_model,
+    )
+
+    prospects, outcomes = load_cohort(range(start, end + 1))
+    X, y, groups, _ = build_feature_matrix(prospects, outcomes)
+    model = train_pairwise_model(X, y, groups)
+    save_model(model)
+    c = concordance(predict_scores(model, X), y.to_numpy(), groups.to_numpy())
+    click.echo(f"trained: in-sample concordance={c:.3f}")
+
+
+@scouting.command("score")
+@click.option("--draft-year", type=int, required=False)
+def scouting_score_cmd(draft_year: int | None) -> None:
+    from sportscards.db.session import session_scope
+    from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_bref import load_cohort
+    from sportscards.scouting.nba.prism import load_model, predict_scores
+    from sportscards.scouting.nba.score import compute_stardom_premium, persist_scores
+
+    years = range(draft_year, draft_year + 1) if draft_year else range(2010, 2025)
+    prospects, outcomes = load_cohort(years)
+    X, _, groups, slugs = build_feature_matrix(prospects, outcomes)
+    model = load_model()
+    scores = predict_scores(model, X)
+    df = compute_stardom_premium(slugs, groups, prospects["draft_pick"], scores)
+    with session_scope() as s:
+        n = persist_scores(s, df)
+    click.echo(f"persisted {n} stardom scores ({len(df)} prospects scored)")
+
+
 def main() -> None:
     cli()
 

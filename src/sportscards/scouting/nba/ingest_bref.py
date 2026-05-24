@@ -1,0 +1,186 @@
+"""Basketball-Reference ingestion for the PRISM scouting model.
+
+Pulls draft classes (college advanced stats + draft slot) and 5-year NBA
+outcomes (BPM, WS, VORP) for prospects 2010 onward, persisting to local
+Parquet under ``data/scouting_cache/``.
+
+Real network calls go through ``BRefClient`` and are gated behind the
+``sportscards scouting ingest-nba`` CLI command. Tests inject a fake client
+so the unit suite never touches the network.
+"""
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol
+
+import pandas as pd
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+logger = logging.getLogger(__name__)
+
+CACHE_DIR = Path("data/scouting_cache")
+BREF_MIN_REQ_INTERVAL_S = 3.5  # ~17 req/min, under BR's 20/min cap
+
+PROSPECT_COLUMNS = [
+    "br_slug",
+    "name",
+    "draft_year",
+    "draft_pick",
+    "position",
+    "age_at_draft",
+    "trb_pct",
+    "ast_pct",
+    "stl_pct",
+    "blk_pct",
+    "usg_pct",
+    "ts_pct",
+    "sos",
+    "recruit_rank_pct",
+    "wingspan_in",
+    "max_vert_in",
+]
+
+OUTCOME_COLUMNS = ["br_slug", "career_bpm_5y", "career_ws_5y", "career_vorp_5y"]
+
+
+class BRefClient(Protocol):
+    """Narrow protocol — only what the ingester needs.
+
+    Implementations may wrap ``basketball_reference_scraper`` or any other
+    source; the rest of the module never imports the library directly.
+    """
+
+    def get_draft_class(self, year: int) -> pd.DataFrame:
+        """Return one row per drafted player with at least the columns:
+        ``br_slug``, ``name``, ``draft_pick``, ``position``, ``age_at_draft``,
+        ``trb_pct``, ``ast_pct``, ``stl_pct``, ``blk_pct``, ``usg_pct``,
+        ``ts_pct``, ``sos``, ``recruit_rank_pct``. Missing columns may be
+        filled with NaN.
+        """
+        ...
+
+    def get_player_career_advanced(self, br_slug: str, max_seasons: int = 5) -> pd.DataFrame:
+        """Return up-to-``max_seasons`` rows of advanced NBA stats for one
+        player, with at least ``BPM``, ``WS``, ``VORP`` columns.
+        """
+        ...
+
+
+@dataclass
+class LiveBRefClient:
+    """Production client that wraps ``basketball_reference_scraper``.
+
+    Kept thin and isolated so it can be swapped or stubbed wholesale. The
+    upstream library is known to break when BR's HTML changes; callers should
+    expect ``RuntimeError`` and degrade gracefully.
+    """
+
+    sleep_s: float = BREF_MIN_REQ_INTERVAL_S
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
+    def get_draft_class(self, year: int) -> pd.DataFrame:
+        try:
+            from basketball_reference_scraper.drafts import get_draft_class
+        except ImportError as e:  # pragma: no cover
+            raise RuntimeError("basketball_reference_scraper not installed") from e
+        time.sleep(self.sleep_s)
+        df = get_draft_class(year)
+        df = df.rename(columns=str.lower)
+        if "player" in df.columns and "name" not in df.columns:
+            df["name"] = df["player"]
+        if "pk" in df.columns and "draft_pick" not in df.columns:
+            df["draft_pick"] = pd.to_numeric(df["pk"], errors="coerce")
+        df["draft_year"] = year
+        return df
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
+    def get_player_career_advanced(
+        self, br_slug: str, max_seasons: int = 5
+    ) -> pd.DataFrame:
+        try:
+            from basketball_reference_scraper.players import get_stats
+        except ImportError as e:  # pragma: no cover
+            raise RuntimeError("basketball_reference_scraper not installed") from e
+        time.sleep(self.sleep_s)
+        df = get_stats(br_slug, stat_type="ADVANCED", playoffs=False, career=False)
+        df = df.rename(columns=str.upper).head(max_seasons)
+        return df
+
+
+def ingest_year(
+    year: int,
+    client: BRefClient,
+    cache_dir: Path = CACHE_DIR,
+) -> tuple[Path, Path]:
+    """Pull one draft class + 5-yr NBA outcomes and write two Parquet files.
+
+    Returns (prospects_path, outcomes_path).
+    """
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    raw = client.get_draft_class(year)
+    prospects = _normalize_prospects(raw, year)
+    prospects_path = cache_dir / f"prospects_{year}.parquet"
+    prospects.to_parquet(prospects_path, index=False)
+    logger.info("wrote %d prospects → %s", len(prospects), prospects_path)
+
+    outcomes: list[dict[str, float | str]] = []
+    for slug in prospects["br_slug"].dropna().unique():
+        try:
+            adv = client.get_player_career_advanced(slug, max_seasons=5)
+        except Exception as e:  # pragma: no cover - network errors degrade
+            logger.warning("career fetch failed for %s: %s", slug, e)
+            continue
+        outcomes.append(_aggregate_outcome(slug, adv))
+
+    outcomes_df = pd.DataFrame(outcomes, columns=OUTCOME_COLUMNS) if outcomes else pd.DataFrame(
+        columns=OUTCOME_COLUMNS
+    )
+    outcomes_path = cache_dir / f"nba_outcomes_{year}.parquet"
+    outcomes_df.to_parquet(outcomes_path, index=False)
+    logger.info("wrote %d outcomes → %s", len(outcomes_df), outcomes_path)
+
+    return prospects_path, outcomes_path
+
+
+def load_cohort(
+    years: range, cache_dir: Path = CACHE_DIR
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Read previously-cached Parquet artifacts for the given draft years."""
+    prospects = pd.concat(
+        [pd.read_parquet(cache_dir / f"prospects_{y}.parquet") for y in years],
+        ignore_index=True,
+    )
+    outcomes = pd.concat(
+        [pd.read_parquet(cache_dir / f"nba_outcomes_{y}.parquet") for y in years],
+        ignore_index=True,
+    )
+    return prospects, outcomes
+
+
+def _normalize_prospects(raw: pd.DataFrame, year: int) -> pd.DataFrame:
+    df = raw.copy()
+    if "br_slug" not in df.columns:
+        df["br_slug"] = df.get("slug", df.get("name", pd.Series(dtype=str)))
+    df["draft_year"] = year
+    for col in PROSPECT_COLUMNS:
+        if col not in df.columns:
+            df[col] = pd.NA
+    return df[PROSPECT_COLUMNS].copy()
+
+
+def _aggregate_outcome(slug: str, adv: pd.DataFrame) -> dict[str, float | str]:
+    def _sum(col: str) -> float:
+        if col not in adv.columns:
+            return 0.0
+        return float(pd.to_numeric(adv[col], errors="coerce").fillna(0.0).sum())
+
+    return {
+        "br_slug": slug,
+        "career_bpm_5y": _sum("BPM"),
+        "career_ws_5y": _sum("WS"),
+        "career_vorp_5y": _sum("VORP"),
+    }
