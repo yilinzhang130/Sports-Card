@@ -18,10 +18,10 @@ dependencies = [
     "pyyaml>=6.0",
     "click>=8.1",
     "pandas>=2.2",
+    "numpy>=2.0",
     "rich>=13.8",
     "catboost>=1.2",
     "pyarrow>=17.0",
-    "numpy>=1.26",
 ]
 
 [project.optional-dependencies]
