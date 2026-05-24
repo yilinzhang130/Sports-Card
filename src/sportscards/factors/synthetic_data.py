@@ -17,6 +17,7 @@ import math
 import random
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -232,7 +233,7 @@ def generate_synthetic_tx(
     truth = pd.DataFrame({"period_start": week_starts, "truth_index": index})
 
     lo, hi = sales_per_cert
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for c in range(n_certs):
         n_sales = int(rng.integers(lo, hi + 1))
         # Pick distinct sale weeks for this cert.

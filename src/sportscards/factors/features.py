@@ -9,6 +9,7 @@ snapshot whose ``snapshot_date <= sold_at``.
 from __future__ import annotations
 
 import contextlib
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -209,15 +210,13 @@ def build_features(session: Session) -> pd.DataFrame:
     df["print_run_log"] = np.log1p(pr.astype(float))
 
     # --- 9-12. Categorical / derived features ------------------------------
-    # parallel_tier needs a Card-like object; emulate via row dict.
+    # parallel_tier needs a Card-like object; emulate via a simple namespace.
     def _row_tier(row: pd.Series) -> int:
-        class _Stub:
-            pass
-
-        stub = _Stub()
-        stub.is_one_of_one = bool(row["is_one_of_one"])
-        stub.print_run = None if pd.isna(row["print_run"]) else int(row["print_run"])
-        stub.parallel = row["parallel"]
+        stub = SimpleNamespace(
+            is_one_of_one=bool(row["is_one_of_one"]),
+            print_run=None if pd.isna(row["print_run"]) else int(row["print_run"]),
+            parallel=row["parallel"],
+        )
         return parallel_tier(stub)  # type: ignore[arg-type]
 
     df["parallel_tier"] = df.apply(_row_tier, axis=1).astype(int)

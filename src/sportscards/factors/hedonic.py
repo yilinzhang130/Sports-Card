@@ -110,8 +110,8 @@ def fit(
     with contextlib.suppress(TypeError, AttributeError):
         cutoff = cutoff.tz_localize(None)  # type: ignore[union-attr]
 
-    train_mask = (sold_at_cmp < cutoff).to_numpy()
-    test_mask = (sold_at_cmp >= cutoff).to_numpy()
+    train_mask = (sold_at_cmp < cutoff).to_numpy()  # type: ignore[operator]
+    test_mask = (sold_at_cmp >= cutoff).to_numpy()  # type: ignore[operator]
 
     if train_mask.sum() == 0 or test_mask.sum() == 0:
         # Fallback: chronological 80/20 by index
@@ -202,7 +202,7 @@ def predict(
 ) -> np.ndarray:
     """Predict log price for each row in df."""
     X, _, _, _ = _build_design_matrix(df, encoder=encoder)
-    return model.predict(X)
+    return np.asarray(model.predict(X))
 
 
 def persist_residuals(
