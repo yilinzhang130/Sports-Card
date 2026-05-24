@@ -5,6 +5,7 @@ Revises:
 Create Date: 2026-05-24
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -47,7 +48,11 @@ def upgrade() -> None:
         sa.Column("has_patch", sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column("is_one_of_one", sa.Boolean, nullable=False, server_default=sa.false()),
         sa.UniqueConstraint(
-            "year", "manufacturer", "set", "card_number", "parallel",
+            "year",
+            "manufacturer",
+            "set",
+            "card_number",
+            "parallel",
             name="uq_card_master_identity",
         ),
     )
@@ -70,7 +75,9 @@ def upgrade() -> None:
         sa.Column("external_id", sa.String(128)),
         sa.Column("raw_json", sa.JSON, server_default="{}"),
         sa.Column(
-            "ingested_at", sa.DateTime(timezone=True), server_default=sa.func.now(),
+            "ingested_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
         ),
         sa.UniqueConstraint("source", "external_id", name="uq_tx_raw_source_extid"),
     )
@@ -81,7 +88,9 @@ def upgrade() -> None:
     op.create_table(
         "tx_clean",
         sa.Column("tx_id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("raw_id", sa.Integer, sa.ForeignKey("tx_raw.raw_id"), nullable=False, unique=True),
+        sa.Column(
+            "raw_id", sa.Integer, sa.ForeignKey("tx_raw.raw_id"), nullable=False, unique=True
+        ),
         sa.Column("card_id", sa.Integer, sa.ForeignKey("card_master.card_id")),
         sa.Column("slab_grader", sa.String(8)),
         sa.Column("slab_grade", sa.Numeric(4, 1)),
@@ -101,7 +110,9 @@ def upgrade() -> None:
         sa.Column("raw_id", sa.Integer, sa.ForeignKey("tx_raw.raw_id"), primary_key=True),
         sa.Column("reason", sa.Text, nullable=False),
         sa.Column(
-            "attempted_at", sa.DateTime(timezone=True), server_default=sa.func.now(),
+            "attempted_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
         ),
     )
 
@@ -113,9 +124,7 @@ def upgrade() -> None:
         sa.Column("grade", sa.Numeric(4, 1), primary_key=True),
         sa.Column("pop_count", sa.Integer, nullable=False),
     )
-    op.execute(
-        "SELECT create_hypertable('pop_snapshots', 'snapshot_date', if_not_exists => TRUE)"
-    )
+    op.execute("SELECT create_hypertable('pop_snapshots', 'snapshot_date', if_not_exists => TRUE)")
 
 
 def downgrade() -> None:

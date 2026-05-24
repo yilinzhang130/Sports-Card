@@ -2,6 +2,7 @@
 
 MVP gate: ≥95% of fixtures with positive expectations match exactly.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -36,7 +37,7 @@ def check_case(case: dict) -> tuple[bool, str]:
             if actual is not None:
                 return False, f"{k}: expected None, got {actual!r}"
             continue
-        if isinstance(v, (int, float)) and not isinstance(v, bool) and k == "slab_grade":
+        if isinstance(v, int | float) and not isinstance(v, bool) and k == "slab_grade":
             if actual != Decimal(str(v)):
                 return False, f"{k}: {actual!r} != {v!r}"
             continue
@@ -66,7 +67,7 @@ def test_fixture_accuracy() -> None:
 
 @pytest.mark.parametrize("case", load_cases(), ids=lambda c: c["title"][:60])
 def test_each_case(case: dict) -> None:
-    """Per-title test for granular CI output. Some may xfail; the aggregate gate is authoritative."""
+    """Per-title test for granular CI output; aggregate gate is authoritative."""
     ok, msg = check_case(case)
     if not ok:
         pytest.xfail(msg)

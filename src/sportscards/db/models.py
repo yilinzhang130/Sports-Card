@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -58,7 +59,11 @@ class Card(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "year", "manufacturer", "set", "card_number", "parallel",
+            "year",
+            "manufacturer",
+            "set",
+            "card_number",
+            "parallel",
             name="uq_card_master_identity",
         ),
         Index("ix_card_master_player", "player_id"),
@@ -82,14 +87,12 @@ class TxRaw(Base):
     raw_currency: Mapped[str] = mapped_column(String(8), default="USD")
     sold_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     external_id: Mapped[str | None] = mapped_column(String(128), index=True)
-    raw_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    raw_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     ingested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
-    __table_args__ = (
-        UniqueConstraint("source", "external_id", name="uq_tx_raw_source_extid"),
-    )
+    __table_args__ = (UniqueConstraint("source", "external_id", name="uq_tx_raw_source_extid"),)
 
 
 class TxClean(Base):
@@ -123,12 +126,8 @@ class PopSnapshot(Base):
 
     __tablename__ = "pop_snapshots"
 
-    snapshot_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), primary_key=True
-    )
-    card_id: Mapped[int] = mapped_column(
-        ForeignKey("card_master.card_id"), primary_key=True
-    )
+    snapshot_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), primary_key=True)
     grader: Mapped[str] = mapped_column(String(8), primary_key=True)
     grade: Mapped[Decimal] = mapped_column(Numeric(4, 1), primary_key=True)
     pop_count: Mapped[int] = mapped_column(Integer, nullable=False)

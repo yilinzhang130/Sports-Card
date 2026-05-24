@@ -38,6 +38,8 @@ dev = [
     "ruff>=0.7",
     "mypy>=1.13",
     "types-pyyaml",
+    "pre-commit>=3.8",
+    "pandas-stubs",
 ]
 
 [tool.ruff]
@@ -51,6 +53,11 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

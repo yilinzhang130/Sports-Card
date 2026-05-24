@@ -9,11 +9,12 @@ Endpoints used:
 
 Docs: https://www.psacard.com/publicapi/documentation
 """
+
 from __future__ import annotations
 
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -54,7 +55,7 @@ class PsaClient:
     def _load_quota(self) -> dict[str, Any]:
         if not QUOTA_PATH.exists():
             return {"date": date.today().isoformat(), "count": 0}
-        data = json.loads(QUOTA_PATH.read_text())
+        data: dict[str, Any] = json.loads(QUOTA_PATH.read_text())
         if data.get("date") != date.today().isoformat():
             return {"date": date.today().isoformat(), "count": 0}
         return data
@@ -63,7 +64,8 @@ class PsaClient:
         QUOTA_PATH.write_text(json.dumps(data))
 
     def quota_remaining(self) -> int:
-        return DAILY_LIMIT - self._load_quota()["count"]
+        count: int = self._load_quota()["count"]
+        return DAILY_LIMIT - count
 
     def _tick(self) -> None:
         q = self._load_quota()
@@ -77,14 +79,17 @@ class PsaClient:
         self._tick()
         resp = self._http.get(f"{BASE}{path}")
         resp.raise_for_status()
-        return resp.json()
+        payload: dict[str, Any] = resp.json()
+        return payload
 
     def get_population_by_spec(self, spec_id: str) -> dict[str, Any]:
-        return self._get(f"/pop/GetPSAPopulation/{spec_id}")
+        payload: dict[str, Any] = self._get(f"/pop/GetPSAPopulation/{spec_id}")
+        return payload
 
     def get_cert(self, cert_number: str) -> dict[str, Any]:
         """Look up a PSA cert and return the full PSACert payload (includes SpecID)."""
-        return self._get(f"/cert/GetByCertNumber/{cert_number}")
+        payload: dict[str, Any] = self._get(f"/cert/GetByCertNumber/{cert_number}")
+        return payload
 
 
 def snapshot_pop(card_spec_pairs: list[tuple[int, str]]) -> int:
@@ -93,7 +98,7 @@ def snapshot_pop(card_spec_pairs: list[tuple[int, str]]) -> int:
     Stops gracefully when daily quota is exhausted. Returns rows written.
     """
     client = PsaClient()
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     written = 0
     with session_scope() as s:
         for card_id, spec_id in card_spec_pairs:
@@ -114,15 +119,19 @@ def snapshot_pop(card_spec_pairs: list[tuple[int, str]]) -> int:
                 pop = r.get("Population") or r.get("pop")
                 if grade is None or pop is None:
                     continue
-                stmt = pg_insert(PopSnapshot).values(
-                    snapshot_date=today,
-                    card_id=card_id,
-                    grader="PSA",
-                    grade=Decimal(str(grade)),
-                    pop_count=int(pop),
-                ).on_conflict_do_update(
-                    index_elements=["snapshot_date", "card_id", "grader", "grade"],
-                    set_={"pop_count": int(pop)},
+                stmt = (
+                    pg_insert(PopSnapshot)
+                    .values(
+                        snapshot_date=today,
+                        card_id=card_id,
+                        grader="PSA",
+                        grade=Decimal(str(grade)),
+                        pop_count=int(pop),
+                    )
+                    .on_conflict_do_update(
+                        index_elements=["snapshot_date", "card_id", "grader", "grade"],
+                        set_={"pop_count": int(pop)},
+                    )
                 )
                 s.execute(stmt)
                 written += 1

@@ -1,4 +1,5 @@
 """Parse unprocessed tx_raw rows into tx_clean (with LLM fallback)."""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -6,13 +7,15 @@ from decimal import Decimal
 from prefect import flow, get_run_logger
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
 
 from sportscards.db.models import Card, ParseFailure, Player, TxClean, TxRaw
 from sportscards.db.session import session_scope
 from sportscards.parse.router import parse_title
+from sportscards.parse.schema import ParsedTitle
 
 
-def _resolve_card_id(s, parsed) -> int | None:
+def _resolve_card_id(s: Session, parsed: ParsedTitle) -> int | None:
     """Best-effort lookup of card_id from parsed fields."""
     if not all([parsed.year, parsed.manufacturer, parsed.set_name, parsed.card_number]):
         return None
@@ -25,7 +28,8 @@ def _resolve_card_id(s, parsed) -> int | None:
     )
     if parsed.player_name:
         q = q.join(Player).where(Player.name == parsed.player_name)
-    return s.execute(q).scalar_one_or_none()
+    result: int | None = s.execute(q).scalar_one_or_none()
+    return result
 
 
 @flow(name="parse-pending")

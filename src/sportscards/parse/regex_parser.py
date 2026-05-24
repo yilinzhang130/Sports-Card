@@ -8,6 +8,7 @@ Targets the dominant title pattern on eBay sold listings, e.g.:
 This intentionally only handles the well-formed majority. Low-confidence
 returns fall through to the LLM parser.
 """
+
 from __future__ import annotations
 
 import re

@@ -8,12 +8,13 @@ Category 214 = Basketball Trading Cards.
 NB: eBay's `sold` filter only returns the past ~90 days. To preserve history
 this ingestor must run daily; gaps are unrecoverable.
 """
+
 from __future__ import annotations
 
 import base64
 import logging
 from collections.abc import Iterator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -34,7 +35,7 @@ class EbayBrowseClient:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
         self._token: str | None = None
-        self._token_exp: datetime = datetime.min.replace(tzinfo=timezone.utc)
+        self._token_exp: datetime = datetime.min.replace(tzinfo=UTC)
         self._http = httpx.Client(timeout=30.0)
 
     @retry(
@@ -46,9 +47,7 @@ class EbayBrowseClient:
         s = self.settings
         if not s.ebay_client_id or not s.ebay_client_secret:
             raise RuntimeError("EBAY_CLIENT_ID / EBAY_CLIENT_SECRET not configured")
-        creds = base64.b64encode(
-            f"{s.ebay_client_id}:{s.ebay_client_secret}".encode()
-        ).decode()
+        creds = base64.b64encode(f"{s.ebay_client_id}:{s.ebay_client_secret}".encode()).decode()
         resp = self._http.post(
             s.ebay_oauth_url,
             headers={
@@ -63,11 +62,11 @@ class EbayBrowseClient:
         resp.raise_for_status()
         body = resp.json()
         self._token = body["access_token"]
-        self._token_exp = datetime.now(timezone.utc) + timedelta(seconds=body["expires_in"] - 60)
+        self._token_exp = datetime.now(UTC) + timedelta(seconds=body["expires_in"] - 60)
         log.info("eBay OAuth token refreshed, expires %s", self._token_exp)
 
     def _auth_header(self) -> dict[str, str]:
-        if self._token is None or datetime.now(timezone.utc) >= self._token_exp:
+        if self._token is None or datetime.now(UTC) >= self._token_exp:
             self._refresh_token()
         return {"Authorization": f"Bearer {self._token}"}
 
@@ -102,7 +101,8 @@ class EbayBrowseClient:
             params=params,
         )
         resp.raise_for_status()
-        return resp.json()
+        payload: dict[str, Any] = resp.json()
+        return payload
 
     def iter_sold(
         self,
@@ -140,9 +140,7 @@ def ingest_sold(
     client = EbayBrowseClient()
     added = 0
     with session_scope() as s:
-        for item in client.iter_sold(
-            keywords=keywords, page_size=page_size, max_pages=max_pages
-        ):
+        for item in client.iter_sold(keywords=keywords, page_size=page_size, max_pages=max_pages):
             external_id = item.get("itemId") or item.get("legacyItemId")
             if not external_id:
                 continue
@@ -152,18 +150,24 @@ def ingest_sold(
             except Exception:
                 raw_price = None
             sold_at_str = item.get("itemEndDate") or item.get("itemCreationDate")
-            sold_at = datetime.fromisoformat(sold_at_str.replace("Z", "+00:00")) if sold_at_str else None
+            sold_at = (
+                datetime.fromisoformat(sold_at_str.replace("Z", "+00:00")) if sold_at_str else None
+            )
 
-            stmt = pg_insert(TxRaw).values(
-                source="ebay",
-                raw_title=item.get("title", ""),
-                raw_price=raw_price,
-                raw_currency=price.get("currency", "USD"),
-                sold_at=sold_at,
-                external_id=str(external_id),
-                raw_json=item,
-            ).on_conflict_do_nothing(constraint="uq_tx_raw_source_extid")
+            stmt = (
+                pg_insert(TxRaw)
+                .values(
+                    source="ebay",
+                    raw_title=item.get("title", ""),
+                    raw_price=raw_price,
+                    raw_currency=price.get("currency", "USD"),
+                    sold_at=sold_at,
+                    external_id=str(external_id),
+                    raw_json=item,
+                )
+                .on_conflict_do_nothing(constraint="uq_tx_raw_source_extid")
+            )
             result = s.execute(stmt)
-            added += result.rowcount or 0
+            added += result.rowcount or 0  # type: ignore[attr-defined]
     log.info("ingested %d new eBay rows (kw=%r)", added, keywords)
     return added
