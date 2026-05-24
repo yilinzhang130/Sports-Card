@@ -38,6 +38,11 @@ def train_pairwise_model(
     train_mask = groups.isin(train_years)
     valid_mask = groups.isin(valid_years)
     if not train_mask.any():
+        logger.warning(
+            "no rows fall in train_years=%s; training on ALL rows with NO validation "
+            "(reported concordance will be in-sample)",
+            list(train_years),
+        )
         train_mask = pd.Series(True, index=groups.index)
         valid_mask = pd.Series(False, index=groups.index)
 

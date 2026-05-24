@@ -62,9 +62,11 @@ class BRefClient(Protocol):
         """
         ...
 
-    def get_player_career_advanced(self, br_slug: str, max_seasons: int = 5) -> pd.DataFrame:
+    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
         """Return up-to-``max_seasons`` rows of advanced NBA stats for one
-        player, with at least ``BPM``, ``WS``, ``VORP`` columns.
+        player (looked up by player NAME — Basketball-Reference's scraper API
+        does not accept BR slugs), with at least ``BPM``, ``WS``, ``VORP``
+        columns.
         """
         ...
 
@@ -98,14 +100,18 @@ class LiveBRefClient:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
     def get_player_career_advanced(
-        self, br_slug: str, max_seasons: int = 5
+        self, name: str, max_seasons: int = 5
     ) -> pd.DataFrame:
+        """`basketball_reference_scraper.players.get_stats` expects a *player
+        name* (e.g. "Luka Doncic"), not a BR slug. The ingester is responsible
+        for passing the name column, not the slug.
+        """
         try:
             from basketball_reference_scraper.players import get_stats
         except ImportError as e:  # pragma: no cover
             raise RuntimeError("basketball_reference_scraper not installed") from e
         time.sleep(self.sleep_s)
-        df = get_stats(br_slug, stat_type="ADVANCED", playoffs=False, career=False)
+        df = get_stats(name, stat_type="ADVANCED", playoffs=False, career=False)
         df = df.rename(columns=str.upper).head(max_seasons)
         return df
 
@@ -128,11 +134,16 @@ def ingest_year(
     logger.info("wrote %d prospects → %s", len(prospects), prospects_path)
 
     outcomes: list[dict[str, float | str]] = []
-    for slug in prospects["br_slug"].dropna().unique():
+    seen_slugs: set[str] = set()
+    for row in prospects[["br_slug", "name"]].dropna(subset=["br_slug"]).itertuples(index=False):
+        slug = str(row.br_slug)
+        if slug in seen_slugs:
+            continue
+        seen_slugs.add(slug)
         try:
-            adv = client.get_player_career_advanced(slug, max_seasons=5)
+            adv = client.get_player_career_advanced(str(row.name), max_seasons=5)
         except Exception as e:  # pragma: no cover - network errors degrade
-            logger.warning("career fetch failed for %s: %s", slug, e)
+            logger.warning("career fetch failed for %s (%s): %s", row.name, slug, e)
             continue
         outcomes.append(_aggregate_outcome(slug, adv))
 

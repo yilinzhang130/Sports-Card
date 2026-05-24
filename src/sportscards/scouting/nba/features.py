@@ -9,6 +9,10 @@ import numpy as np
 import pandas as pd
 
 POSITIONS = ["PG", "SG", "SF", "PF", "C"]
+# BR uses single-letter shorthands ('G', 'F') for older draft classes. Map them
+# to the dominant two-letter bucket so feature signal isn't silently lost.
+POSITION_ALIASES: dict[str, str] = {"G": "SG", "F": "SF"}
+UNDRAFTED_SENTINEL = 61.0  # one past the last NBA pick — bust prior
 
 NUMERIC_FEATURES = [
     "trb_pct",
@@ -42,20 +46,36 @@ def build_feature_matrix(
     Prospects missing from ``outcomes`` are treated as zero-BPM career (DNP or
     bust) rather than dropped, so the cohort size matches the draft class.
     """
-    merged = prospects.merge(outcomes, on="br_slug", how="left")
+    # Outcomes is allowed to be missing a slug → treat as bust. Multiple rows
+    # for the same slug would explode the cohort; collapse defensively.
+    outcomes_unique = outcomes.drop_duplicates(subset="br_slug", keep="first")
+    merged = prospects.merge(outcomes_unique, on="br_slug", how="left").reset_index(
+        drop=True
+    )
     merged["career_bpm_5y"] = pd.to_numeric(
         merged["career_bpm_5y"], errors="coerce"
     ).fillna(0.0)
-    merged["draft_pick"] = pd.to_numeric(merged["draft_pick"], errors="coerce")
-    merged["log_draft_pick"] = np.log1p(merged["draft_pick"].fillna(60.0))
-    merged["mock_rank"] = merged["draft_pick"].fillna(60.0)
+
+    # Compute draft_pick *once*, with UNDRAFTED_SENTINEL imputation, and use
+    # that single value to derive log_draft_pick and mock_rank. The earlier
+    # version of this block overwrote draft_pick with 0.0 in the NUMERIC_
+    # FEATURES loop AFTER deriving log/mock, producing internally
+    # contradictory features.
+    merged["draft_pick"] = pd.to_numeric(merged["draft_pick"], errors="coerce").fillna(
+        UNDRAFTED_SENTINEL
+    )
+    merged["log_draft_pick"] = np.log1p(merged["draft_pick"])
+    merged["mock_rank"] = merged["draft_pick"]
 
     for col in NUMERIC_FEATURES:
+        if col in {"draft_pick", "log_draft_pick", "mock_rank"}:
+            continue  # already imputed above; do not re-overwrite
         if col not in merged.columns:
             merged[col] = 0.0
         merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0.0)
 
-    pos = merged["position"].fillna("").astype(str).str.upper().str[:2]
+    pos_raw = merged["position"].fillna("").astype(str).str.upper().str.strip()
+    pos = pos_raw.replace(POSITION_ALIASES).str[:2]
     for p in POSITIONS:
         merged[f"pos_{p}"] = (pos == p).astype(int)
 

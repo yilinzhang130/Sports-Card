@@ -25,8 +25,8 @@ def upgrade() -> None:
             sa.ForeignKey("player_master.player_id"),
             primary_key=True,
         ),
+        sa.Column("model_version", sa.String(32), primary_key=True),
         sa.Column("draft_year", sa.Integer, nullable=False),
-        sa.Column("model_version", sa.String(32), nullable=False),
         sa.Column("premium", sa.Numeric(6, 4), nullable=False),
         sa.Column("percentile_rank", sa.Numeric(6, 4), nullable=False),
         sa.Column(
