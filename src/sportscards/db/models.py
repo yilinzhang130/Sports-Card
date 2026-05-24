@@ -132,3 +132,19 @@ class PopSnapshot(Base):
     grader: Mapped[str] = mapped_column(String(8), primary_key=True)
     grade: Mapped[Decimal] = mapped_column(Numeric(4, 1), primary_key=True)
     pop_count: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class TxMispricing(Base):
+    __tablename__ = "tx_mispricing"
+
+    tx_id: Mapped[int] = mapped_column(ForeignKey("tx_clean.tx_id"), primary_key=True)
+    model_version: Mapped[str] = mapped_column(String(32), primary_key=True)
+    residual: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+    predicted_log_price: Mapped[Decimal] = mapped_column(Numeric(10, 6), nullable=False)
+    fit_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_tx_mispricing_residual", "residual"),
+    )

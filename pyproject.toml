@@ -19,6 +19,10 @@ dependencies = [
     "click>=8.1",
     "pandas>=2.2",
     "rich>=13.8",
+    "xgboost>=2.0",
+    "optuna>=3.6",
+    "joblib>=1.4",
+    "scikit-learn>=1.5",
 ]
 
 [project.scripts]
