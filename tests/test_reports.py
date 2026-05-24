@@ -70,3 +70,18 @@ def test_render_monthly_letter_is_idempotent(tmp_path, monkeypatch):
     p2 = render.render_monthly_letter("2024-12", out_dir=tmp_path)
     assert p1 == p2
     assert p1.exists()
+
+
+import importlib
+import sys
+
+
+def test_dashboard_imports_cleanly():
+    """The Streamlit dashboard module imports without executing Streamlit calls."""
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root))
+    try:
+        mod = importlib.import_module("reports.dashboard")
+    finally:
+        sys.path.remove(str(repo_root))
+    assert hasattr(mod, "render_dashboard")
