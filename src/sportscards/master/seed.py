@@ -27,7 +27,8 @@ def seed_players(path: Path | None = None) -> int:
                 index_elements=["br_slug"]
             )
             res = s.execute(stmt)
-            added += res.rowcount or 0
+            # psycopg returns -1 for ON CONFLICT DO NOTHING when nothing inserted
+            added += max(res.rowcount or 0, 0)
     log.info("seeded %d players", added)
     return added
 
@@ -55,6 +56,7 @@ def seed_cards(path: Path | None = None) -> int:
                 constraint="uq_card_master_identity"
             )
             res = s.execute(stmt)
-            added += res.rowcount or 0
+            # psycopg returns -1 for ON CONFLICT DO NOTHING when nothing inserted
+            added += max(res.rowcount or 0, 0)
     log.info("seeded %d cards", added)
     return added

@@ -1,6 +1,13 @@
-# Priority queue for daily PSA pop snapshots.
-# Each entry maps a card_master row to its PSA spec ID. Populate after
-# you've seeded cards and looked up spec IDs on psacard.com.
-# Format:
-# - {card_id: 1, psa_spec_id: "12345"}
-[]
+# Daily PSA pop snapshot priority queue.
+# Fill psa_spec_id by running: sportscards psa lookup-cert <any cert of this card>
+# Then pull SpecID from the response.
+- {card_id: 10, psa_spec_id: "TBD"}  # 2023 Prizm Base #1 Victor Wembanyama
+- {card_id: 6, psa_spec_id: "TBD"}  # 2019 Prizm Base #248 Zion Williamson
+- {card_id: 7, psa_spec_id: "TBD"}  # 2019 Prizm Silver #248 Zion Williamson
+- {card_id: 8, psa_spec_id: "TBD"}  # 2019 Prizm Base #249 Ja Morant
+- {card_id: 1, psa_spec_id: "TBD"}  # 2018 Prizm Base #280 Luka Doncic
+- {card_id: 2, psa_spec_id: "TBD"}  # 2018 Prizm Silver #280 Luka Doncic
+- {card_id: 3, psa_spec_id: "TBD"}  # 2018 Prizm Gold /10 #280 Luka Doncic
+- {card_id: 9, psa_spec_id: "TBD"}  # 2017 Prizm Base #12 Jayson Tatum
+- {card_id: 5, psa_spec_id: "TBD"}  # 2003 Topps Chrome Refractor #111 LeBron James
+- {card_id: 4, psa_spec_id: "TBD"}  # 2003 Topps Chrome Base #111 LeBron James

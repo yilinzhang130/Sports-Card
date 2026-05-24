@@ -1,51 +1,217 @@
 # Hand-labeled NBA card title fixtures for regex parser regression tests.
-# Production target: 100 titles, ≥95% accuracy.
-# Initial seed of well-formed titles below — expand to 100 manually before MVP gate.
+# Target: ≥95% accuracy on this set (the parse_title regex_parser alone, no LLM).
+# Titles mirror real eBay sold-listing styles; truth labels are minimum-must-extract.
+
+# === 2018-19 Panini Prizm Luka rookie variants ===
 - title: "2018-19 Panini Prizm Luka Doncic #280 Silver PSA 10 Rookie RC"
-  expect:
-    year: 2018
-    manufacturer: Panini
-    set_name: Prizm
-    card_number: "280"
-    parallel: Silver
-    slab_grader: PSA
-    slab_grade: 10
-    is_rookie: true
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2018-19 Panini Prizm Luka Doncic #280 Base PSA 10"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Base, slab_grader: PSA, slab_grade: 10}
+- title: "2018-19 Panini Prizm Luka Doncic Red Wave #280 BGS 9.5 RC"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Red Wave, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2018-19 Panini Prizm #280 Luka Doncic Rookie Green PSA 10"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Green, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2018 Panini Prizm Luka Doncic #280 Blue Wave PSA 9 RC"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Blue Wave, slab_grader: PSA, slab_grade: 9, is_rookie: true}
+- title: "2018-19 Prizm Luka Doncic Orange #280 PSA 10 Rookie"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Orange, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2018-19 Panini Prizm Pink Ice Luka Doncic #280 PSA 9 RC"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Pink, slab_grader: PSA, slab_grade: 9, is_rookie: true}
+- title: "2018-19 Prizm Luka Doncic #280 Purple Wave SGC 9.5 Rookie"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Purple, slab_grader: SGC, slab_grade: 9.5, is_rookie: true}
+
+# === 2003-04 Topps Chrome LeBron ===
 - title: "2003-04 Topps Chrome Refractor LeBron James #111 PSA 9"
-  expect:
-    year: 2003
-    manufacturer: Topps
-    set_name: Topps Chrome
-    card_number: "111"
-    parallel: Refractor
-    slab_grader: PSA
-    slab_grade: 9
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Refractor, slab_grader: PSA, slab_grade: 9}
+- title: "2003-04 Topps Chrome LeBron James #111 Rookie PSA 10"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2003 Topps Chrome Refractor LeBron James RC #111 BGS 9"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Refractor, slab_grader: BGS, slab_grade: 9, is_rookie: true}
+- title: "2003-04 Topps Chrome Black Refractor LeBron James #111 PSA 8"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Refractor, slab_grader: PSA, slab_grade: 8}
+- title: "2003-04 Topps Chrome X-Fractor LeBron James #111 BGS 9.5"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: X-Fractor, slab_grader: BGS, slab_grade: 9.5}
+- title: "2003-04 Topps Chrome Xfractor LeBron #111 PSA 9"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: X-Fractor, slab_grader: PSA, slab_grade: 9}
+
+# === 2019-20 National Treasures / Prizm Zion ===
 - title: "2019-20 Panini National Treasures Zion Williamson RPA /99 BGS 9.5"
-  expect:
-    year: 2019
-    manufacturer: Panini
-    set_name: National Treasures
-    parallel: "/99"
-    has_patch: true
-    slab_grader: BGS
-    slab_grade: 9.5
-- title: "2017-18 Panini Select Jayson Tatum #45 Silver Prizm RC PSA 10"
-  expect:
-    year: 2017
-    manufacturer: Panini
-    set_name: Select
-    card_number: "45"
-    parallel: Silver
-    slab_grader: PSA
-    slab_grade: 10
-    is_rookie: true
+  expect: {year: 2019, manufacturer: Panini, set_name: National Treasures, parallel: "/99", has_patch: true, slab_grader: BGS, slab_grade: 9.5}
+- title: "2019-20 National Treasures Zion Williamson Rookie Patch Auto /99 PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: National Treasures, parallel: "/99", has_patch: true, has_auto: true, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Panini Prizm Zion Williamson #248 Silver Rookie PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Prizm Zion Williamson #248 Base PSA 10 RC"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Panini Prizm Zion Williamson #248 Red Wave PSA 9"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Red Wave, slab_grader: PSA, slab_grade: 9}
+- title: "2019-20 Panini Prizm Gold #248 Zion Williamson /10 BGS 9"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: "/10", slab_grader: BGS, slab_grade: 9}
+
+# === 2019-20 Prizm / Optic Ja Morant ===
+- title: "2019-20 Panini Prizm Ja Morant #249 Silver PSA 10 Rookie"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "249", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
 - title: "2019-20 Donruss Optic Ja Morant #38 Holo Rookie PSA 10"
-  expect:
-    year: 2019
-    manufacturer: Panini
-    set_name: Donruss Optic
-    card_number: "38"
-    parallel: Holo
-    slab_grader: PSA
-    slab_grade: 10
-    is_rookie: true
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "38", parallel: Holo, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Donruss Optic Ja Morant #38 Pink Rookie BGS 9.5"
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "38", parallel: Pink, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2019-20 Optic Ja Morant #38 Red PSA 10 Rookie"
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "38", parallel: Red, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Optic Ja Morant Blue Velocity #38 PSA 9 RC"
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "38", parallel: Blue, slab_grader: PSA, slab_grade: 9, is_rookie: true}
+
+# === 2017-18 Prizm / Select Tatum ===
+- title: "2017-18 Panini Prizm Jayson Tatum #12 Silver PSA 10 Rookie"
+  expect: {year: 2017, manufacturer: Panini, set_name: Prizm, card_number: "12", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2017-18 Panini Prizm Jayson Tatum #12 Base PSA 10 RC"
+  expect: {year: 2017, manufacturer: Panini, set_name: Prizm, card_number: "12", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2017-18 Panini Select Jayson Tatum #45 Silver Prizm RC PSA 10"
+  expect: {year: 2017, manufacturer: Panini, set_name: Select, card_number: "45", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2017-18 Panini Select Tatum Concourse #45 PSA 10 Rookie"
+  expect: {year: 2017, manufacturer: Panini, set_name: Select, card_number: "45", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2017-18 Select Jayson Tatum Premier Level #145 BGS 9.5"
+  expect: {year: 2017, manufacturer: Panini, set_name: Select, card_number: "145", parallel: Base, slab_grader: BGS, slab_grade: 9.5}
+
+# === 2023-24 Wembanyama ===
+- title: "2023-24 Panini Prizm Victor Wembanyama #1 Silver PSA 10 Rookie"
+  expect: {year: 2023, manufacturer: Panini, set_name: Prizm, card_number: "1", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2023-24 Panini Prizm Wembanyama #1 Base PSA 10 RC"
+  expect: {year: 2023, manufacturer: Panini, set_name: Prizm, card_number: "1", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2023-24 Prizm Wembanyama Green #1 BGS 9.5 Rookie"
+  expect: {year: 2023, manufacturer: Panini, set_name: Prizm, card_number: "1", parallel: Green, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2023-24 Panini Select Wembanyama #100 Silver Prizm PSA 10 RC"
+  expect: {year: 2023, manufacturer: Panini, set_name: Select, card_number: "100", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2023-24 National Treasures Wembanyama RPA /99 BGS 9.5 Rookie"
+  expect: {year: 2023, manufacturer: Panini, set_name: National Treasures, parallel: "/99", has_patch: true, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2023-24 Mosaic Wembanyama #1 Silver PSA 10 Rookie"
+  expect: {year: 2023, manufacturer: Panini, set_name: Mosaic, card_number: "1", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+
+# === Kobe vintage ===
+- title: "1996-97 Topps Chrome Kobe Bryant #138 Refractor PSA 9 Rookie"
+  expect: {year: 1996, manufacturer: Topps, set_name: Topps Chrome, card_number: "138", parallel: Refractor, slab_grader: PSA, slab_grade: 9, is_rookie: true}
+- title: "1996-97 Topps Chrome Kobe Bryant #138 PSA 10"
+  expect: {year: 1996, manufacturer: Topps, set_name: Topps Chrome, card_number: "138", parallel: Base, slab_grader: PSA, slab_grade: 10}
+- title: "1996 Topps Chrome Refractor Kobe Bryant Rookie RC #138 BGS 9"
+  expect: {year: 1996, manufacturer: Topps, set_name: Topps Chrome, card_number: "138", parallel: Refractor, slab_grader: BGS, slab_grade: 9, is_rookie: true}
+
+# === Jordan vintage ===
+- title: "1986-87 Fleer Michael Jordan #57 Rookie PSA 8"
+  expect: {year: 1986, manufacturer: Fleer, card_number: "57", parallel: Base, slab_grader: PSA, slab_grade: 8, is_rookie: true}
+- title: "1986 Fleer Michael Jordan Rookie #57 SGC 9"
+  expect: {year: 1986, manufacturer: Fleer, card_number: "57", parallel: Base, slab_grader: SGC, slab_grade: 9, is_rookie: true}
+- title: "1986-87 Fleer Michael Jordan RC #57 BGS 8.5"
+  expect: {year: 1986, manufacturer: Fleer, card_number: "57", parallel: Base, slab_grader: BGS, slab_grade: 8.5, is_rookie: true}
+
+# === LeBron parallel/post-rookie ===
+- title: "2020-21 Panini Prizm LeBron James #4 Silver PSA 10"
+  expect: {year: 2020, manufacturer: Panini, set_name: Prizm, card_number: "4", parallel: Silver, slab_grader: PSA, slab_grade: 10}
+- title: "2020-21 Panini Select LeBron James #1 Silver Prizm PSA 10"
+  expect: {year: 2020, manufacturer: Panini, set_name: Select, card_number: "1", parallel: Silver, slab_grader: PSA, slab_grade: 10}
+- title: "2020-21 Donruss Optic LeBron James Holo #61 PSA 10"
+  expect: {year: 2020, manufacturer: Panini, set_name: Donruss Optic, card_number: "61", parallel: Holo, slab_grader: PSA, slab_grade: 10}
+- title: "2019-20 Panini Mosaic LeBron James #8 Silver PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: Mosaic, card_number: "8", parallel: Silver, slab_grader: PSA, slab_grade: 10}
+- title: "2019-20 Mosaic LeBron James #8 Green BGS 9.5"
+  expect: {year: 2019, manufacturer: Panini, set_name: Mosaic, card_number: "8", parallel: Green, slab_grader: BGS, slab_grade: 9.5}
+
+# === Other Panini premium sets ===
+- title: "2018-19 Panini Flawless Luka Doncic Patch Auto /25 BGS 9.5 Rookie"
+  expect: {year: 2018, manufacturer: Panini, set_name: Flawless, parallel: Base, has_patch: true, has_auto: true, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2019-20 Panini Immaculate Zion Williamson Auto /99 PSA 10 RC"
+  expect: {year: 2019, manufacturer: Panini, set_name: Immaculate, parallel: "/99", has_auto: true, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2018-19 Panini Contenders Luka Doncic Rookie Ticket Auto #126 PSA 10"
+  expect: {year: 2018, manufacturer: Panini, set_name: Contenders, card_number: "126", parallel: Base, has_auto: true, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Panini Hoops Zion Williamson #258 Purple Rookie PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: Hoops, card_number: "258", parallel: Purple, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2018-19 Panini Donruss Luka Doncic #177 Rated Rookie PSA 10"
+  expect: {year: 2018, manufacturer: Panini, set_name: Donruss, card_number: "177", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+
+# === Slab grade variants (PSA 8.5, 7.5 etc.) ===
+- title: "2017-18 Panini Prizm Jayson Tatum #12 PSA 8.5 Rookie"
+  expect: {year: 2017, manufacturer: Panini, set_name: Prizm, card_number: "12", parallel: Base, slab_grader: PSA, slab_grade: 8.5, is_rookie: true}
+- title: "2003-04 Topps Chrome LeBron James #111 PSA 7"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Base, slab_grader: PSA, slab_grade: 7}
+- title: "1996-97 Topps Chrome Kobe Bryant #138 BGS 7.5"
+  expect: {year: 1996, manufacturer: Topps, set_name: Topps Chrome, card_number: "138", parallel: Base, slab_grader: BGS, slab_grade: 7.5}
+- title: "2018-19 Panini Prizm Luka Doncic #280 SGC 8"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Base, slab_grader: SGC, slab_grade: 8}
+- title: "2019-20 Prizm Zion #248 CGC 9.5"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Base, slab_grader: CGC, slab_grade: 9.5}
+
+# === Print-run-only parallels (parallel becomes "/N") ===
+- title: "2018-19 Panini Prizm Luka Doncic Gold #280 /10 BGS 9"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: "Gold /10", slab_grader: BGS, slab_grade: 9}
+- title: "2019-20 Prizm Zion Black #248 1/1 PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Black 1/1, slab_grader: PSA, slab_grade: 10, is_one_of_one: true}
+- title: "2003-04 Topps Chrome LeBron Gold Refractor #111 /50 BGS 9"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Refractor, slab_grader: BGS, slab_grade: 9}
+
+# === Year edge cases ===
+- title: "2018 Prizm #280 Luka Doncic Silver PSA 10 RC"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019 Optic Ja Morant Rookie #38 Holo PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "38", parallel: Holo, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2023 Prizm Wembanyama #1 PSA 10 Rookie"
+  expect: {year: 2023, manufacturer: Panini, set_name: Prizm, card_number: "1", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+
+# === Auto cards ===
+- title: "2018-19 Panini Prizm Luka Doncic Auto #280 PSA 10 Rookie"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Base, has_auto: true, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2019-20 Optic Ja Morant Auto #38 BGS 9.5 RC"
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "38", parallel: Base, has_auto: true, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2023-24 Prizm Wembanyama Autograph #1 PSA 10 Rookie"
+  expect: {year: 2023, manufacturer: Panini, set_name: Prizm, card_number: "1", parallel: Base, has_auto: true, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+
+# === Mixed prefix words ===
+- title: "Lot 2018-19 Panini Prizm Luka Doncic #280 Silver PSA 10"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Silver, slab_grader: PSA, slab_grade: 10}
+- title: "BEAUTIFUL 2019-20 Prizm Zion #248 Silver Rookie PSA 10 RC"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "**INVEST** 2018-19 Panini Prizm Luka Doncic #280 PSA 10 RC ROOKIE"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Base, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "🔥 2019-20 Prizm Zion Silver Rookie #248 PSA 10 🔥"
+  expect: {year: 2019, manufacturer: Panini, set_name: Prizm, card_number: "248", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+
+# === Patch / Memorabilia ===
+- title: "2018-19 Panini Prizm Luka Doncic Patch Auto /25 BGS 9.5 RC"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: ~, parallel: "/25", has_patch: true, has_auto: true, slab_grader: BGS, slab_grade: 9.5, is_rookie: true}
+- title: "2017-18 Select Tatum Patch Auto RPA #45 BGS 9 Rookie"
+  expect: {year: 2017, manufacturer: Panini, set_name: Select, card_number: "45", parallel: Base, has_patch: true, has_auto: true, slab_grader: BGS, slab_grade: 9, is_rookie: true}
+
+# === Topps Basketball 2025+ (post new license) ===
+- title: "2025-26 Topps Chrome Basketball Wembanyama #1 PSA 10"
+  expect: {year: 2025, manufacturer: Topps, set_name: Topps Chrome, card_number: "1", parallel: Base, slab_grader: PSA, slab_grade: 10}
+- title: "2025-26 Topps Chrome Refractor Wembanyama #1 PSA 10"
+  expect: {year: 2025, manufacturer: Topps, set_name: Topps Chrome, card_number: "1", parallel: Refractor, slab_grader: PSA, slab_grade: 10}
+
+# === Multiple parallels in title (X-Fractor vs Refractor) ===
+- title: "2003-04 Topps Chrome LeBron James X-Fractor Refractor #111 BGS 8.5"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: X-Fractor, slab_grader: BGS, slab_grade: 8.5}
+
+# === Negative / low-quality (intended to confidence below floor) ===
+- title: "rare card lebron lot of 5"
+  expect: {confidence_below: 0.5}
+- title: "vintage basketball card collection"
+  expect: {confidence_below: 0.5}
+- title: "junk wax box 1990s NBA"
+  expect: {confidence_below: 0.5}
+
+# === Card number with letters / hyphens (insert variants) ===
+- title: "2018-19 Panini Prizm Luka Doncic Color Blast #CB-LD PSA 10"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "CB-LD", parallel: Base, slab_grader: PSA, slab_grade: 10}
+- title: "2019-20 Optic Ja Morant Fast Break Holo #FB-JM PSA 10"
+  expect: {year: 2019, manufacturer: Panini, set_name: Donruss Optic, card_number: "FB-JM", parallel: Holo, slab_grader: PSA, slab_grade: 10}
+
+# === Spaces & abbreviated grade format ===
+- title: "2018-19 Panini Prizm Luka Doncic #280 Silver PSA10 RC"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+
+# === More vintage Topps Chrome ===
+- title: "1997-98 Topps Chrome Kobe Bryant #171 Refractor PSA 9"
+  expect: {year: 1997, manufacturer: Topps, set_name: Topps Chrome, card_number: "171", parallel: Refractor, slab_grader: PSA, slab_grade: 9}
+
+# === Set name only, no manufacturer ===
+- title: "2018-19 Prizm Luka Doncic #280 Silver PSA 10 Rookie"
+  expect: {year: 2018, manufacturer: Panini, set_name: Prizm, card_number: "280", parallel: Silver, slab_grader: PSA, slab_grade: 10, is_rookie: true}
+- title: "2003-04 Topps Chrome #111 LeBron James Rookie PSA 9"
+  expect: {year: 2003, manufacturer: Topps, set_name: Topps Chrome, card_number: "111", parallel: Base, slab_grader: PSA, slab_grade: 9, is_rookie: true}

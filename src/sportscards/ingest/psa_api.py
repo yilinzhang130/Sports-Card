@@ -82,6 +82,10 @@ class PsaClient:
     def get_population_by_spec(self, spec_id: str) -> dict[str, Any]:
         return self._get(f"/pop/GetPSAPopulation/{spec_id}")
 
+    def get_cert(self, cert_number: str) -> dict[str, Any]:
+        """Look up a PSA cert and return the full PSACert payload (includes SpecID)."""
+        return self._get(f"/cert/GetByCertNumber/{cert_number}")
+
 
 def snapshot_pop(card_spec_pairs: list[tuple[int, str]]) -> int:
     """For each (card_id, psa_spec_id) pair, fetch pop and write snapshot rows.

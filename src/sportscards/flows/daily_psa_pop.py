@@ -21,8 +21,15 @@ def daily_psa_pop_flow() -> int:
     if not PRIORITY_FILE.exists():
         log.warning("PSA priority file missing at %s; nothing to snapshot", PRIORITY_FILE)
         return 0
-    pairs_raw: list[dict[str, str | int]] = yaml.safe_load(PRIORITY_FILE.read_text())
-    pairs = [(int(p["card_id"]), str(p["psa_spec_id"])) for p in pairs_raw]
+    pairs_raw: list[dict[str, str | int]] = yaml.safe_load(PRIORITY_FILE.read_text()) or []
+    pairs = [
+        (int(p["card_id"]), str(p["psa_spec_id"]))
+        for p in pairs_raw
+        if str(p.get("psa_spec_id", "TBD")) != "TBD"
+    ]
+    if not pairs:
+        log.warning("No PSA spec IDs filled in %s; run `sportscards psa lookup-cert`", PRIORITY_FILE)
+        return 0
     return snapshot_pop(pairs)
 
 

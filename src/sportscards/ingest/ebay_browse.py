@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from sportscards.config import Settings, get_settings
 from sportscards.db.models import TxRaw
@@ -37,7 +37,11 @@ class EbayBrowseClient:
         self._token_exp: datetime = datetime.min.replace(tzinfo=timezone.utc)
         self._http = httpx.Client(timeout=30.0)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=30))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=30),
+        retry=retry_if_not_exception_type(RuntimeError),
+    )
     def _refresh_token(self) -> None:
         s = self.settings
         if not s.ebay_client_id or not s.ebay_client_secret:
@@ -67,7 +71,11 @@ class EbayBrowseClient:
             self._refresh_token()
         return {"Authorization": f"Bearer {self._token}"}
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, max=30))
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, max=30),
+        retry=retry_if_not_exception_type(RuntimeError),
+    )
     def search(
         self,
         *,
