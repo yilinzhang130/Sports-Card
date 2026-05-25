@@ -69,3 +69,70 @@ def test_gem_rate_no_snapshot_returns_prior(session):
     r = estimate_gem_rate(session, card_id=1, as_of=now)
     assert r.rate == UNIVERSE_PRIOR
     assert r.sample_size == 0
+
+
+from sportscards.db.models import Card, TxClean, TxRaw
+from sportscards.factors.grading_ev import (
+    GradingEV,
+    compute_grading_ev,
+    rank_grading_candidates,
+)
+
+
+def _planted_card(s, card_id, hedonic_p10, hedonic_p9, gem_rate):
+    """Patch hedonic price + gem rate, and implant a high-n pop snapshot."""
+    from sportscards.factors import grading_ev as ge
+
+    ge._HEDONIC_OVERRIDES[card_id] = (Decimal(str(hedonic_p10)), Decimal(str(hedonic_p9)))
+    ge._GEM_RATE_OVERRIDES[card_id] = Decimal(str(gem_rate))
+    total = 1000
+    psa10 = int(gem_rate * total)
+    psa9 = total - psa10
+    _add_pop(s, card_id, datetime(2026, 5, 1, tzinfo=timezone.utc),
+             psa8=0, psa9=psa9, psa10=psa10)
+
+
+def _add_raw_comp(s, card_id, price):
+    raw = TxRaw(source="ebay", external_id=f"x-{card_id}-{price}",
+                raw_title=f"raw-{card_id}", raw_price=Decimal(price),
+                sold_at=datetime(2026, 5, 1, tzinfo=timezone.utc))
+    s.add(raw)
+    s.flush()
+    s.add(TxClean(raw_id=raw.raw_id, card_id=card_id, slab_grader=None,
+                  slab_grade=None, price_usd=Decimal(price),
+                  sold_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+                  parser_confidence=Decimal("0.90"),
+                  parser_method="regex_raw"))
+    s.commit()
+
+
+def test_compute_grading_ev_matches_formula(session):
+    # gem=0.20, P10=1000, P9=100, cost=24.99 (value_bulk), raw=80
+    _planted_card(session, 1, hedonic_p10=1000, hedonic_p9=100, gem_rate=0.20)
+    _add_raw_comp(session, 1, "80")
+    ev = compute_grading_ev(session, card_id=1,
+                            as_of=datetime(2026, 5, 1, tzinfo=timezone.utc))
+    # net P10 = 1000*(1-0.1325)-0.30 = 867.20; net P9 = 100*(1-0.1325)-0.30 = 86.45
+    # EV = 0.20*867.20 + 0.80*86.45 − 24.99 − 80 = 173.44 + 69.16 − 104.99 = 137.61
+    assert abs(ev.ev - Decimal("137.61")) < Decimal("0.50")
+    assert ev.raw_price == Decimal("80")
+    assert ev.sample_size == 1000
+
+
+def test_rank_excludes_negative_ev(session):
+    session.add(Card(card_id=2, year=2020, manufacturer="Panini", set_name="Prizm",
+                     card_number="2", parallel="Base", player_id=1))
+    session.add(Card(card_id=3, year=2020, manufacturer="Panini", set_name="Prizm",
+                     card_number="3", parallel="Base", player_id=1))
+    session.commit()
+    _planted_card(session, 2, hedonic_p10=1000, hedonic_p9=100, gem_rate=0.20)
+    _add_raw_comp(session, 2, "80")
+    _planted_card(session, 3, hedonic_p10=1000, hedonic_p9=100, gem_rate=0.20)
+    _add_raw_comp(session, 3, "500")  # raw too expensive → negative EV
+    df = rank_grading_candidates(
+        session,
+        as_of=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        min_ev_per_dollar=Decimal("0.15"),
+    )
+    assert 2 in df["card_id"].tolist()
+    assert 3 not in df["card_id"].tolist()
