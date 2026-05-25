@@ -178,7 +178,13 @@ def portfolio() -> None:
 
 @portfolio.command("plan")
 @click.option("--aum", type=float, default=1_000_000.0)
-def portfolio_plan_cmd(aum: float) -> None:
+@click.option(
+    "--tactical",
+    is_flag=True,
+    default=False,
+    help="Apply tactical tilt by catalyst score within each sleeve.",
+)
+def portfolio_plan_cmd(aum: float, tactical: bool) -> None:
     """Print current target weights (anchor-only fallback if no factor data)."""
     import warnings as _w
 
@@ -187,7 +193,12 @@ def portfolio_plan_cmd(aum: float) -> None:
     from rich.table import Table
 
     from sportscards.db.session import session_scope
-    from sportscards.portfolio.adapters import load_anchors, load_mispricing, load_stardom
+    from sportscards.portfolio.adapters import (
+        load_anchors,
+        load_catalyst_scores,
+        load_mispricing,
+        load_stardom,
+    )
     from sportscards.portfolio.construction import (
         AllocationConfig,
         UniverseSnapshot,
@@ -195,15 +206,28 @@ def portfolio_plan_cmd(aum: float) -> None:
     )
 
     now = pd.Timestamp.utcnow()
+    catalyst_scores: dict[int, float] | None = None
     with _w.catch_warnings(record=True) as caught:
         _w.simplefilter("always")
         with session_scope() as s:
             anchors = load_anchors(s)
             mispricing = load_mispricing(s, now)
             stardom = load_stardom(s, now)
+            if tactical:
+                ids: set[int] = set()
+                if not anchors.empty:
+                    ids.update(int(x) for x in anchors["card_id"].tolist())
+                if mispricing is not None and not mispricing.empty:
+                    ids.update(int(x) for x in mispricing["card_id"].tolist())
+                if stardom is not None and not stardom.empty:
+                    ids.update(int(x) for x in stardom["card_id"].tolist())
+                catalyst_scores = load_catalyst_scores(
+                    s, sorted(ids), now.to_pydatetime()
+                )
         positions = build_portfolio(
             UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
-            AllocationConfig(total_aum_usd=aum),
+            AllocationConfig(total_aum_usd=aum, tactical_tilt=tactical),
+            catalyst_scores=catalyst_scores,
         )
 
     console = Console()
