@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
 import pandas as pd
-from sqlalchemy import inspect, text
+from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from sportscards.db.session import get_engine
 
@@ -164,6 +166,99 @@ def factor_panel_latest(engine: Engine | None = None) -> pd.DataFrame:
         "ORDER BY f.cs_momentum_pct DESC NULLS LAST"
     )
     return pd.read_sql(sql, eng)
+
+
+# --- Catalysts (Phase 5) -------------------------------------------------------
+
+
+def recent_events(engine: Engine | None = None, days: int = 30, limit: int = 100) -> pd.DataFrame:
+    """Latest events in the past `days`.
+
+    Columns: event_date, player_name, event_type, event_payload.
+    """
+    eng = _engine(engine)
+    _require(eng, "player_events", "Phase 5 catalyst")
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    sql = text(
+        "SELECT e.event_date, p.name AS player_name, e.event_type, e.event_payload "
+        "FROM player_events e "
+        "JOIN player_master p ON p.player_id = e.player_id "
+        "WHERE e.event_date >= :cutoff "
+        "ORDER BY e.event_date DESC "
+        "LIMIT :lim"
+    )
+    return pd.read_sql(sql, eng, params={"cutoff": cutoff, "lim": limit})  # type: ignore[arg-type]
+
+
+def top_catalysts(engine: Engine | None = None, days: int = 30, limit: int = 10) -> pd.DataFrame:
+    """Top N players by absolute catalyst score over the past `days`.
+
+    Columns: player_id, player_name, catalyst_score.
+    """
+    from sportscards.factors.catalyst import compute_catalyst_scores_bulk
+
+    eng = _engine(engine)
+    _require(eng, "player_events", "Phase 5 catalyst")
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    as_of = datetime.now(UTC)
+
+    with Session(eng) as session:
+        pid_rows = session.execute(
+            text("SELECT DISTINCT player_id FROM player_events WHERE event_date >= :cutoff"),
+            {"cutoff": cutoff},
+        ).all()
+        player_ids = [int(r[0]) for r in pid_rows]
+        if not player_ids:
+            return pd.DataFrame(columns=["player_id", "player_name", "catalyst_score"])
+        scores = compute_catalyst_scores_bulk(session, player_ids, as_of)
+        name_rows = session.execute(
+            text("SELECT player_id, name FROM player_master WHERE player_id IN :pids").bindparams(
+                bindparam("pids", expanding=True)
+            ),
+            {"pids": player_ids},
+        ).all()
+        names = {int(pid): name for pid, name in name_rows}
+
+    rows = [
+        {
+            "player_id": pid,
+            "player_name": names.get(pid, ""),
+            "catalyst_score": float(score),
+        }
+        for pid, score in scores.items()
+    ]
+    df = pd.DataFrame(rows, columns=["player_id", "player_name", "catalyst_score"])
+    if df.empty:
+        return df
+    df = df.reindex(df["catalyst_score"].abs().sort_values(ascending=False).index)
+    return df.head(limit).reset_index(drop=True)
+
+
+def player_catalyst_sparkline(
+    player_id: int,
+    engine: Engine | None = None,
+    days: int = 180,
+    step_days: int = 7,
+) -> pd.DataFrame:
+    """Time series of catalyst_score for one player.
+
+    Sampled every `step_days` over the past `days`. Columns: as_of, catalyst_score.
+    """
+    from sportscards.factors.catalyst import compute_catalyst_score
+
+    eng = _engine(engine)
+    _require(eng, "player_events", "Phase 5 catalyst")
+
+    today = datetime.now(UTC)
+    start = today - timedelta(days=days)
+    rows: list[dict[str, object]] = []
+    with Session(eng) as session:
+        cur = start
+        while cur <= today:
+            score = compute_catalyst_score(session, player_id, cur)
+            rows.append({"as_of": cur, "catalyst_score": float(score)})
+            cur = cur + timedelta(days=step_days)
+    return pd.DataFrame(rows, columns=["as_of", "catalyst_score"])
 
 
 # --- Data health (Phase 1 — always available) ----------------------------------

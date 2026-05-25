@@ -141,6 +141,38 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
     ]
 
 
+def load_catalyst_scores(session: Any, card_ids: list[int], as_of: datetime) -> dict[int, float]:
+    """Map ``card_id → catalyst_score`` for the card's player as of date.
+
+    Joins ``card_master → player_master → catalyst.compute_catalyst_scores_bulk``.
+    Returns 0.0 for cards whose player has no recent events, or whose
+    ``card_id`` has no ``player_id``.
+    """
+    if not card_ids:
+        return {}
+    from sportscards.db.models import Card
+    from sportscards.factors.catalyst import compute_catalyst_scores_bulk
+
+    rows = session.execute(
+        select(Card.card_id, Card.player_id).where(Card.card_id.in_(card_ids))
+    ).all()
+    card_to_player: dict[int, int] = {
+        r.card_id: r.player_id for r in rows if r.player_id is not None
+    }
+    player_ids = list({pid for pid in card_to_player.values()})
+    if not player_ids:
+        return {cid: 0.0 for cid in card_ids}
+    bulk = compute_catalyst_scores_bulk(session, player_ids, as_of)
+    out: dict[int, float] = {}
+    for cid in card_ids:
+        pid = card_to_player.get(cid)
+        if pid is None:
+            out[cid] = 0.0
+        else:
+            out[cid] = float(bulk.get(pid, 0))
+    return out
+
+
 def load_price_panel(
     session: Any,
     card_ids: list[int],

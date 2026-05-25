@@ -31,3 +31,12 @@ deployments:
       - cron: "*/30 * * * *"
         timezone: America/Los_Angeles
         active: true
+
+  - name: daily-events
+    entrypoint: src/sportscards/flows/daily_events.py:daily_events_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "0 8 * * *"
+        timezone: America/Los_Angeles
+        active: true

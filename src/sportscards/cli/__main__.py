@@ -182,7 +182,13 @@ def portfolio() -> None:
 
 @portfolio.command("plan")
 @click.option("--aum", type=float, default=1_000_000.0)
-def portfolio_plan_cmd(aum: float) -> None:
+@click.option(
+    "--tactical",
+    is_flag=True,
+    default=False,
+    help="Apply tactical tilt by catalyst score within each sleeve.",
+)
+def portfolio_plan_cmd(aum: float, tactical: bool) -> None:
     """Print current target weights (anchor-only fallback if no factor data)."""
     import warnings as _w
 
@@ -191,7 +197,12 @@ def portfolio_plan_cmd(aum: float) -> None:
     from rich.table import Table
 
     from sportscards.db.session import session_scope
-    from sportscards.portfolio.adapters import load_anchors, load_mispricing, load_stardom
+    from sportscards.portfolio.adapters import (
+        load_anchors,
+        load_catalyst_scores,
+        load_mispricing,
+        load_stardom,
+    )
     from sportscards.portfolio.construction import (
         AllocationConfig,
         UniverseSnapshot,
@@ -199,15 +210,26 @@ def portfolio_plan_cmd(aum: float) -> None:
     )
 
     now = pd.Timestamp.utcnow()
+    catalyst_scores: dict[int, float] | None = None
     with _w.catch_warnings(record=True) as caught:
         _w.simplefilter("always")
         with session_scope() as s:
             anchors = load_anchors(s)
             mispricing = load_mispricing(s, now)
             stardom = load_stardom(s, now)
+            if tactical:
+                ids: set[int] = set()
+                if not anchors.empty:
+                    ids.update(int(x) for x in anchors["card_id"].tolist())
+                if mispricing is not None and not mispricing.empty:
+                    ids.update(int(x) for x in mispricing["card_id"].tolist())
+                if stardom is not None and not stardom.empty:
+                    ids.update(int(x) for x in stardom["card_id"].tolist())
+                catalyst_scores = load_catalyst_scores(s, sorted(ids), now.to_pydatetime())
         positions = build_portfolio(
             UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
-            AllocationConfig(total_aum_usd=aum),
+            AllocationConfig(total_aum_usd=aum, tactical_tilt=tactical),
+            catalyst_scores=catalyst_scores,
         )
 
     console = Console()
@@ -804,6 +826,68 @@ def index_seed_synthetic_cmd(certs: int, weeks: int, seed: int, card_id: int) ->
 
     n = seed_synthetic_tx(n_certs=certs, weeks=weeks, seed=seed, card_id=card_id)
     click.echo(f"seeded {n} synthetic tx_clean rows")
+
+
+@cli.group()
+def events() -> None:
+    """NBA catalyst event ingestors."""
+
+
+@events.command("refresh-injuries")
+def events_refresh_injuries_cmd() -> None:
+    """Pull the latest NBA injury report and write status-change events."""
+    from datetime import date as _date
+
+    from sportscards.db.session import session_scope
+    from sportscards.events.injuries import LiveInjuryClient, ingest_injuries
+
+    with session_scope() as s:
+        n = ingest_injuries(s, client=LiveInjuryClient(), as_of=_date.today())
+    click.echo(f"wrote {n} injury events")
+
+
+@events.command("refresh-schedule")
+@click.option("--season", default=None, help="Season string (e.g. '2025-26'); default = current")
+def events_refresh_schedule_cmd(season: str | None) -> None:
+    """Pull NBA schedule and write playoff/finals win events."""
+    from sportscards.db.session import session_scope
+    from sportscards.events.schedule import LiveScheduleClient, ingest_schedule
+    from sportscards.flows.daily_events import _current_season
+
+    s_str = season or _current_season()
+    with session_scope() as s:
+        n = ingest_schedule(s, client=LiveScheduleClient(), season=s_str)
+    click.echo(f"wrote {n} schedule events")
+
+
+@events.command("refresh-awards")
+@click.option("--season", default=None, help="Season string; default = current")
+def events_refresh_awards_cmd(season: str | None) -> None:
+    """Pull NBA awards and write award events."""
+    from sportscards.db.session import session_scope
+    from sportscards.events.awards import LiveAwardsClient, ingest_awards
+    from sportscards.flows.daily_events import _current_season
+
+    s_str = season or _current_season()
+    with session_scope() as s:
+        n = ingest_awards(s, client=LiveAwardsClient(), season=s_str)
+    click.echo(f"wrote {n} award events")
+
+
+@events.command("refresh-transactions")
+@click.option("--since-days", default=7, type=int)
+def events_refresh_transactions_cmd(since_days: int) -> None:
+    """Pull recent NBA transactions and write call-up/two-way events."""
+    from datetime import date as _date
+    from datetime import timedelta as _td
+
+    from sportscards.db.session import session_scope
+    from sportscards.events.transactions import LiveTransactionsClient, ingest_transactions
+
+    since = _date.today() - _td(days=since_days)
+    with session_scope() as s:
+        n = ingest_transactions(s, client=LiveTransactionsClient(), since=since)
+    click.echo(f"wrote {n} transaction events")
 
 
 @cli.command("dashboard")
