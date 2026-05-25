@@ -80,6 +80,58 @@ def _mispricing_tab() -> None:
     st.dataframe(d["overvalued"], use_container_width=True)
 
 
+def _compute_uplift(stardom_df: "pd.DataFrame") -> "pd.Series":
+    """Counterfactual hedonic_v2 fitted-price uplift (%): predict with
+    stardom_premium=row.premium vs. 0 on a stub modern-rookie feature row.
+    Returns NaN series if the saved model file is absent."""
+    import numpy as np
+    import pandas as pd
+    from sportscards.factors.hedonic import MODEL_PATH, load_model, predict
+
+    if not MODEL_PATH.exists():
+        return pd.Series([float("nan")] * len(stardom_df), index=stardom_df.index)
+    model, enc, _ = load_model()
+    base = _stub_feature_row()
+    out = []
+    for prem in stardom_df["premium"].astype(float):
+        with_ = base.copy()
+        with_["stardom_premium"] = prem
+        with_["stardom_premium_x_is_rookie"] = prem * with_["is_rookie"]
+        with_["has_stardom_score"] = True
+        without = base.copy()
+        without["stardom_premium"] = 0.0
+        without["stardom_premium_x_is_rookie"] = 0.0
+        without["has_stardom_score"] = False
+        log_with = predict(model, enc, pd.DataFrame([with_]))[0]
+        log_without = predict(model, enc, pd.DataFrame([without]))[0]
+        out.append(100.0 * (float(np.exp(log_with - log_without)) - 1.0))
+    return pd.Series(out, index=stardom_df.index)
+
+
+def _stub_feature_row() -> dict:
+    return {
+        "log_pop_psa10": 4.0,
+        "log_pop_psa9_or_better": 4.5,
+        "parallel_tier": 2,
+        "print_run_log": 3.0,
+        "slab_grade": 10.0,
+        "player_age_at_sale": 22.0,
+        "years_since_draft": 1,
+        "draft_pick": 10,
+        "is_rookie": 1,
+        "has_auto": 0,
+        "has_patch": 0,
+        "is_one_of_one": 0,
+        "era_modern": 1,
+        "set_tier": "flagship",
+        "team_market": "standard",
+        "slab_grader": "PSA",
+        "stardom_premium": 0.0,
+        "has_stardom_score": False,
+        "stardom_premium_x_is_rookie": 0.0,
+    }
+
+
 def _prospect_tab() -> None:
     st.header("Prospect Board")
     try:
@@ -90,6 +142,8 @@ def _prospect_tab() -> None:
     if df.empty:
         st.write("No stardom scores yet.")
         return
+    df = df.copy()
+    df["card_fair_value_uplift_pct"] = _compute_uplift(df)
     st.dataframe(df, use_container_width=True)
     chosen = st.selectbox("Player price sparkline", options=df["name"].tolist())
     if chosen:
