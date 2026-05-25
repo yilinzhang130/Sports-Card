@@ -1,0 +1,244 @@
+"""Market — read-only views ported from the legacy single-file dashboard.
+
+Tabs: Index, Mispricing, Prospects, Forward Prospects, Factor Panel.
+(Data Health lives on Home.py.)
+"""
+from __future__ import annotations
+
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+from reports.app._components.auth import guard_localhost
+from reports.app._components.ui import job_badge
+from sportscards.reports import queries
+from sportscards.reports.queries import TableMissing
+
+st.set_page_config(page_title="Market", page_icon="📊", layout="wide")
+guard_localhost()
+job_badge()
+
+st.title("📊 Market")
+
+
+# --- cached query wrappers ---------------------------------------------------
+
+@st.cache_data(ttl=300)
+def _cached_index() -> pd.DataFrame:
+    return queries.repeat_sales_index()
+
+
+@st.cache_data(ttl=300)
+def _cached_mispricing() -> dict[str, pd.DataFrame]:
+    return queries.mispricing_leaderboard()
+
+
+@st.cache_data(ttl=300)
+def _cached_stardom() -> pd.DataFrame:
+    return queries.stardom_scores()
+
+
+@st.cache_data(ttl=300)
+def _cached_player_prices(player_id: int) -> pd.DataFrame:
+    return queries.player_price_history(player_id)
+
+
+@st.cache_data(ttl=300)
+def _cached_forward_prospects() -> pd.DataFrame:
+    return queries.forward_prospects()
+
+
+@st.cache_data(ttl=300)
+def _cached_factor_panel() -> pd.DataFrame:
+    return queries.factor_panel_latest()
+
+
+def _placeholder(phase: str) -> None:
+    st.info(f"Coming with {phase}.")
+
+
+# --- tab implementations (verbatim from legacy dashboard) --------------------
+
+def _market_tab() -> None:
+    st.header("Market Overview")
+    try:
+        df = _cached_index()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Index unavailable: {e}")
+        return
+    if df.empty:
+        st.write("No index data yet.")
+        return
+    fig = px.line(
+        df,
+        x="as_of",
+        y="index_value",
+        color="sleeve",
+        title="Repeat-Sales Index",
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def _mispricing_tab() -> None:
+    st.header("Mispricing Leaderboard")
+    try:
+        d = _cached_mispricing()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Mispricing data unavailable: {e}")
+        return
+    st.subheader("Top 20 Undervalued (positive residual)")
+    st.dataframe(d["undervalued"], use_container_width=True)
+    st.subheader("Top 20 Overvalued (negative residual)")
+    st.dataframe(d["overvalued"], use_container_width=True)
+
+
+def _compute_uplift(stardom_df: pd.DataFrame) -> pd.Series:
+    """Counterfactual hedonic_v2 fitted-price uplift (%): predict with
+    stardom_premium=row.premium vs. 0 on a stub modern-rookie feature row.
+    Returns NaN series if the saved model file is absent."""
+    import numpy as np
+    import pandas as pd
+
+    from sportscards.factors.hedonic import MODEL_PATH, load_model, predict
+
+    if not MODEL_PATH.exists():
+        return pd.Series([float("nan")] * len(stardom_df), index=stardom_df.index)
+    model, enc, _ = load_model()
+    base = _stub_feature_row()
+    out = []
+    for prem in stardom_df["premium"].astype(float):
+        with_ = base.copy()
+        with_["stardom_premium"] = prem
+        with_["stardom_premium_x_is_rookie"] = prem * with_["is_rookie"]
+        with_["has_stardom_score"] = True
+        without = base.copy()
+        without["stardom_premium"] = 0.0
+        without["stardom_premium_x_is_rookie"] = 0.0
+        without["has_stardom_score"] = False
+        log_with = predict(model, enc, pd.DataFrame([with_]))[0]
+        log_without = predict(model, enc, pd.DataFrame([without]))[0]
+        out.append(100.0 * (float(np.exp(log_with - log_without)) - 1.0))
+    return pd.Series(out, index=stardom_df.index)
+
+
+def _stub_feature_row() -> dict:
+    return {
+        "log_pop_psa10": 4.0,
+        "log_pop_psa9_or_better": 4.5,
+        "parallel_tier": 2,
+        "print_run_log": 3.0,
+        "slab_grade": 10.0,
+        "player_age_at_sale": 22.0,
+        "years_since_draft": 1,
+        "draft_pick": 10,
+        "is_rookie": 1,
+        "has_auto": 0,
+        "has_patch": 0,
+        "is_one_of_one": 0,
+        "era_modern": 1,
+        "set_tier": "flagship",
+        "team_market": "standard",
+        "slab_grader": "PSA",
+        "stardom_premium": 0.0,
+        "has_stardom_score": False,
+        "stardom_premium_x_is_rookie": 0.0,
+    }
+
+
+def _prospects_tab() -> None:
+    st.header("Prospect Board")
+    try:
+        df = _cached_stardom()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Prospect data unavailable: {e}")
+        return
+    if df.empty:
+        st.write("No stardom scores yet.")
+        return
+    df = df.copy()
+    df["card_fair_value_uplift_pct"] = _compute_uplift(df)
+    st.dataframe(df, use_container_width=True)
+    chosen = st.selectbox("Player price sparkline", options=df["name"].tolist())
+    if chosen:
+        pid = int(df.loc[df["name"] == chosen, "player_id"].iloc[0])
+        try:
+            prices = _cached_player_prices(pid)
+        except TableMissing as e:
+            _placeholder(e.phase)
+            return
+        if not prices.empty:
+            fig = px.line(
+                prices,
+                x="sold_at",
+                y="price_usd",
+                title=f"{chosen} — recent sales",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+
+def _forward_prospects_tab() -> None:
+    st.header("Forward Prospects")
+    st.caption(
+        "Pre-draft PRISM scores for current-season NCAA prospects. "
+        "Premium = pairwise percentile − mock-draft consensus percentile. "
+        "Positive = market under-prices the prospect."
+    )
+    try:
+        df = _cached_forward_prospects()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Forward prospects data unavailable: {e}")
+        return
+    if df.empty:
+        st.info(
+            "No forecasts yet. Run "
+            "`sportscards scouting score-class --draft-year YYYY --season 2025-26` "
+            "to populate."
+        )
+        return
+    st.dataframe(df, use_container_width=True)
+
+
+def _factor_tab() -> None:
+    st.header("Factor Panel — Momentum + Liquidity")
+    try:
+        df = _cached_factor_panel()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Factor panel data unavailable: {e}")
+        return
+    if df.empty:
+        st.write("No factor_panel snapshot yet. Run `sportscards factor compute-panel`.")
+        return
+    st.caption(f"As of {df['as_of_date'].iloc[0]} — {len(df)} cards")
+    st.dataframe(df, use_container_width=True)
+
+
+# --- render ------------------------------------------------------------------
+
+tab_index, tab_mispricing, tab_prospects, tab_forward, tab_factor = st.tabs(
+    ["Index", "Mispricing", "Prospects", "Forward Prospects", "Factor Panel"]
+)
+with tab_index:
+    _market_tab()
+with tab_mispricing:
+    _mispricing_tab()
+with tab_prospects:
+    _prospects_tab()
+with tab_forward:
+    _forward_prospects_tab()
+with tab_factor:
+    _factor_tab()
