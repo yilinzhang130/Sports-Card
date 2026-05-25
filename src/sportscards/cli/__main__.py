@@ -630,6 +630,54 @@ def letter_cmd(month: str) -> None:
     click.echo(f"wrote {out}")
 
 
+@cli.group()
+def ev() -> None:
+    """Grading-EV optionality model."""
+
+
+@ev.command("compute")
+@click.option("--as-of", default=None, help="ISO date; default today (UTC)")
+@click.option("--grade-tier", default="value_bulk")
+@click.option("--apply-trend-adjustment", is_flag=True, default=False)
+def ev_compute_cmd(as_of: str | None, grade_tier: str, apply_trend_adjustment: bool) -> None:
+    from sportscards.flows.daily_grading_ev import daily_grading_ev_flow
+
+    n = daily_grading_ev_flow(
+        grade_tier=grade_tier,
+        apply_trend_adjustment=apply_trend_adjustment,
+    )
+    click.echo(f"wrote {n} grading_ev rows")
+
+
+@ev.command("top")
+@click.option("--limit", default=20, type=int)
+@click.option("--grade-tier", default="value_bulk")
+@click.option("--min-ev-per-dollar", default=0.15, type=float)
+def ev_top_cmd(limit: int, grade_tier: str, min_ev_per_dollar: float) -> None:
+    from datetime import datetime, timezone
+    from decimal import Decimal
+
+    from sportscards.db.session import session_scope
+    from sportscards.factors.grading_ev import rank_grading_candidates
+
+    with session_scope() as s:
+        df = rank_grading_candidates(
+            s,
+            as_of=datetime.now(tz=timezone.utc),
+            grade_tier=grade_tier,
+            min_ev_per_dollar=Decimal(str(min_ev_per_dollar)),
+        )
+    if df.empty:
+        click.echo("no positive-EV candidates")
+        return
+    for _, row in df.head(limit).iterrows():
+        click.echo(
+            f"card_id={int(row.card_id):>6} ev=${row.ev:>8.2f} "
+            f"ev/$={row.ev_per_dollar:>5.2f} gem={row.gem_rate:.2f} "
+            f"raw=${row.raw_price:.2f} (n={int(row.sample_size)})"
+        )
+
+
 def main() -> None:
     cli()
 
