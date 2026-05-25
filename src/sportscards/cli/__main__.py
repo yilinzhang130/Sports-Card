@@ -532,6 +532,27 @@ def index_seed_synthetic_cmd(certs: int, weeks: int, seed: int, card_id: int) ->
     click.echo(f"seeded {n} synthetic tx_clean rows")
 
 
+@cli.command("dashboard")
+def dashboard_cmd() -> None:
+    """Launch the Streamlit dashboard."""
+    import subprocess
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    app = repo_root / "reports" / "dashboard.py"
+    subprocess.run(["streamlit", "run", str(app)], check=False)
+
+
+@cli.command("letter")
+@click.option("--month", required=True, help="Month in YYYY-MM format")
+def letter_cmd(month: str) -> None:
+    """Render the monthly investor letter to letters/YYYY-MM.md."""
+    from sportscards.reports.render import render_monthly_letter
+
+    out = render_monthly_letter(month)
+    click.echo(f"wrote {out}")
+
+
 def main() -> None:
     cli()
 

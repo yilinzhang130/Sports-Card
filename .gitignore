@@ -17,3 +17,4 @@ data/
 *.csv
 *.parquet
 !tests/fixtures/*.csv
+letters/*.md

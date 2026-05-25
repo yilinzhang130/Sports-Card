@@ -1,0 +1,55 @@
+# Sportscards Quant — Monthly Letter ({{ month }})
+
+## Index Performance
+{% if index_returns -%}
+| Window | Return |
+|--------|--------|
+| 1-month  | {{ "%.2f%%"|format(index_returns["1m"] * 100) }} |
+| 3-month  | {{ "%.2f%%"|format(index_returns["3m"] * 100) }} |
+| 12-month | {{ "%.2f%%"|format(index_returns["12m"] * 100) }} |
+{%- else %}
+_Repeat-sales index not yet available (Phase 2A pending)._
+{%- endif %}
+
+## Top Mispricings
+{% if top_mispricings is not none and not top_mispricings.empty -%}
+| Player | Year | Set | Parallel | Residual |
+|--------|------|-----|----------|----------|
+{% for row in top_mispricings.itertuples() -%}
+| {{ row.player }} | {{ row.year }} | {{ row.set_name }} | {{ row.parallel }} | {{ "%.2f"|format(row.residual) }} |
+{% endfor %}
+{%- else %}
+_Mispricing model not yet available (Phase 2B pending)._
+{%- endif %}
+
+## Recent Rebalance Trades
+{% if rebalance_trades is not none and not rebalance_trades.empty -%}
+| Date | Side | Card | Qty | Price |
+|------|------|------|-----|-------|
+{% for row in rebalance_trades.itertuples() -%}
+| {{ row.trade_date }} | {{ row.side }} | {{ row.card_id }} | {{ row.qty }} | {{ row.price }} |
+{% endfor %}
+{%- else %}
+_Backtester / live portfolio not yet available (Phase 4 pending)._
+{%- endif %}
+
+## Fee Drag YTD
+{% if fee_drag_ytd is not none -%}
+**{{ "%.2f%%"|format(fee_drag_ytd * 100) }}** of gross sales spent on marketplace fees year-to-date.
+{%- else %}
+_No fee data available for {{ month }}._
+{%- endif %}
+
+## Sleeve Allocation
+{% if sleeve_allocation is not none and not sleeve_allocation.empty -%}
+| Sleeve | Target | Current |
+|--------|--------|---------|
+{% for row in sleeve_allocation.itertuples() -%}
+| {{ row.sleeve }} | {{ "%.1f%%"|format(row.target_weight * 100) }} | {{ "%.1f%%"|format(row.current_weight * 100) }} |
+{% endfor %}
+{%- else %}
+_Portfolio sleeves not yet defined (Phase 4 pending)._
+{%- endif %}
+
+---
+_Generated automatically by sportscards-quant. Not investment advice._
