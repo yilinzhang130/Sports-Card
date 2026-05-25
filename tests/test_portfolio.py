@@ -184,3 +184,11 @@ def test_beta_to_index_perfectly_correlated() -> None:
     r = pd.Series([0.01, 0.02, -0.01, 0.03])
     i = r * 2.0
     assert beta_to_index(r, i) == pytest.approx(0.5)
+
+
+def test_target_positions_carry_signal_source():
+    u = _make_universe()
+    positions = build_portfolio(u, cfg=AllocationConfig(total_aum_usd=1_000_000))
+    sources = {p.signal_source for p in positions}
+    assert sources <= {"anchor", "factor", "prospect"}
+    assert "anchor" in sources
