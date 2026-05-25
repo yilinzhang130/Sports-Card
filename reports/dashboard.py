@@ -39,6 +39,21 @@ def _cached_backtest() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
+def _cached_top_catalysts() -> pd.DataFrame:
+    return queries.top_catalysts(days=30, limit=10)
+
+
+@st.cache_data(ttl=300)
+def _cached_recent_events() -> pd.DataFrame:
+    return queries.recent_events(days=30, limit=100)
+
+
+@st.cache_data(ttl=300)
+def _cached_catalyst_sparkline(player_id: int) -> pd.DataFrame:
+    return queries.player_catalyst_sparkline(player_id)
+
+
+@st.cache_data(ttl=300)
 def _cached_health() -> dict[str, pd.DataFrame]:
     return queries.data_health()
 
@@ -109,6 +124,48 @@ def _prospect_tab() -> None:
             st.plotly_chart(fig, use_container_width=True)
 
 
+def _catalysts_tab() -> None:
+    st.header("Catalysts")
+    try:
+        top = _cached_top_catalysts()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    st.subheader("Top 10 catalysts (last 30 days)")
+    st.dataframe(top, use_container_width=True)
+
+    st.subheader("Recent events")
+    try:
+        events = _cached_recent_events()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    st.dataframe(events, use_container_width=True)
+
+    st.subheader("Player catalyst sparkline")
+    if top.empty:
+        st.write("No catalyst-scored players in the window.")
+        return
+    chosen = st.selectbox(
+        "Player", options=top["player_name"].tolist(), key="catalyst_player"
+    )
+    if chosen:
+        pid = int(top.loc[top["player_name"] == chosen, "player_id"].iloc[0])
+        try:
+            spark = _cached_catalyst_sparkline(pid)
+        except TableMissing as e:
+            _placeholder(e.phase)
+            return
+        if not spark.empty:
+            fig = px.line(
+                spark,
+                x="as_of",
+                y="catalyst_score",
+                title=f"{chosen} — catalyst score",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+
 def _portfolio_tab() -> None:
     st.header("Portfolio")
     try:
@@ -140,7 +197,9 @@ def _health_tab() -> None:
 def render_dashboard() -> None:
     st.set_page_config(page_title="sportscards-quant", layout="wide")
     st.title("sportscards-quant")
-    tabs = st.tabs(["Market", "Mispricing", "Prospects", "Portfolio", "Data Health"])
+    tabs = st.tabs(
+        ["Market", "Mispricing", "Prospects", "Catalysts", "Portfolio", "Data Health"]
+    )
     with tabs[0]:
         _market_tab()
     with tabs[1]:
@@ -148,8 +207,10 @@ def render_dashboard() -> None:
     with tabs[2]:
         _prospect_tab()
     with tabs[3]:
-        _portfolio_tab()
+        _catalysts_tab()
     with tabs[4]:
+        _portfolio_tab()
+    with tabs[5]:
         _health_tab()
 
 
