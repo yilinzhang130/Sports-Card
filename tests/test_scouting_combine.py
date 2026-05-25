@@ -25,22 +25,22 @@ from sportscards.scouting.nba import ingest_combine, prism
 FREAKS = [
     # slug, name, height_ws, wingspan, weight, reach, max_vert, lane_agility,
     # 3/4_sprint, true_bpm
-    ("freak1", "Freak One",   84.0, 92.0, 250, 112.0, 40.0, 10.5, 3.10, 30.0),
-    ("freak2", "Freak Two",   82.0, 90.0, 230, 110.0, 41.0, 10.3, 3.05, 28.0),
+    ("freak1", "Freak One", 84.0, 92.0, 250, 112.0, 40.0, 10.5, 3.10, 30.0),
+    ("freak2", "Freak Two", 82.0, 90.0, 230, 110.0, 41.0, 10.3, 3.05, 28.0),
     ("freak3", "Freak Three", 81.0, 89.0, 220, 109.0, 42.0, 10.4, 3.00, 26.0),
-    ("freak4", "Freak Four",  80.0, 88.0, 215, 107.0, 39.0, 10.6, 3.15, 25.0),
-    ("freak5", "Freak Five",  83.0, 91.0, 240, 111.0, 38.0, 10.7, 3.20, 24.0),
+    ("freak4", "Freak Four", 80.0, 88.0, 215, 107.0, 39.0, 10.6, 3.15, 25.0),
+    ("freak5", "Freak Five", 83.0, 91.0, 240, 111.0, 38.0, 10.7, 3.20, 24.0),
 ]
 AVERAGES = [
-    ("avg1", "Avg One",   78.0, 79.0, 210, 104.0, 33.0, 11.5, 3.30, 8.0),
-    ("avg2", "Avg Two",   77.0, 78.0, 200, 103.0, 32.0, 11.4, 3.28, 7.0),
+    ("avg1", "Avg One", 78.0, 79.0, 210, 104.0, 33.0, 11.5, 3.30, 8.0),
+    ("avg2", "Avg Two", 77.0, 78.0, 200, 103.0, 32.0, 11.4, 3.28, 7.0),
     ("avg3", "Avg Three", 79.0, 80.0, 215, 105.0, 34.0, 11.3, 3.27, 9.0),
-    ("avg4", "Avg Four",  76.0, 77.0, 195, 102.0, 31.0, 11.6, 3.32, 6.0),
+    ("avg4", "Avg Four", 76.0, 77.0, 195, 102.0, 31.0, 11.6, 3.32, 6.0),
 ]
 NO_COMBINE = [
     # only slug/name/true_bpm; no combine row at all
-    ("nocomb1", "No Combine One",   5.0),
-    ("nocomb2", "No Combine Two",   4.0),
+    ("nocomb1", "No Combine One", 5.0),
+    ("nocomb2", "No Combine Two", 4.0),
     ("nocomb3", "No Combine Three", 3.0),
 ]
 
@@ -185,13 +185,11 @@ def test_merge_combine_imputes_missing_and_flags(synthetic_with_combine) -> None
     # The imputed value is the cohort median of observed rows. Confirm one
     # feature explicitly to guard against accidental zero-fill. Note the
     # ape-index formula uses height_no_shoes (matches features.merge_combine).
-    observed_wingspan_minus = (
-        combine["wingspan"].astype(float) - combine["height_no_shoes"].astype(float)
+    observed_wingspan_minus = combine["wingspan"].astype(float) - combine["height_no_shoes"].astype(
+        float
     )
     expected_median = float(observed_wingspan_minus.median())
-    nocomb_value = float(
-        merged.set_index("br_slug").loc["nocomb1", "wingspan_minus_height"]
-    )
+    nocomb_value = float(merged.set_index("br_slug").loc["nocomb1", "wingspan_minus_height"])
     assert nocomb_value == pytest.approx(expected_median)
 
 

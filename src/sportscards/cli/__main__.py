@@ -510,6 +510,8 @@ def scouting_refit_mle_cmd() -> None:
             "WARNING: <5 draft classes for some origins — keeping seeded "
             "MLE multipliers. Re-run after more data is ingested."
         )
+
+
 @scouting.command("ingest-combine")
 @click.option(
     "--year",

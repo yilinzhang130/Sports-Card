@@ -74,6 +74,7 @@ COMBINE_COLUMNS = [
     "bench_press",
 ]
 
+
 class CombineClient(Protocol):
     """Narrow protocol — only the call the ingester needs."""
 
@@ -147,9 +148,7 @@ def ingest_year(
     return out
 
 
-def load_combine_cohort(
-    years: Iterable[int], cache_dir: Path = CACHE_DIR
-) -> pd.DataFrame:
+def load_combine_cohort(years: Iterable[int], cache_dir: Path = CACHE_DIR) -> pd.DataFrame:
     """Read previously-cached combine Parquet artifacts for the given years.
 
     Years with no cache file are silently skipped — combine attendance and

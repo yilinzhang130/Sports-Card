@@ -57,7 +57,7 @@ NUMERIC_FEATURES = [
 # a sibling ``combine_<feature>_imputed`` boolean column for each.
 COMBINE_FEATURES = [
     "wingspan_minus_height",  # wingspan - height_with_shoes; ape-index
-    "bmi",                    # 703 * weight_lb / height_in^2
+    "bmi",  # 703 * weight_lb / height_in^2
     "standing_reach",
     "max_vertical",
     "lane_agility_time",
@@ -99,7 +99,7 @@ def merge_combine(prospects: pd.DataFrame, combine: pd.DataFrame) -> pd.DataFram
     combine["wingspan_minus_height"] = wingspan - height
     # Standard BMI formula in imperial units: 703 * lb / in^2.
     with np.errstate(divide="ignore", invalid="ignore"):
-        combine["bmi"] = 703.0 * weight / (height ** 2)
+        combine["bmi"] = 703.0 * weight / (height**2)
     for col in ("standing_reach", "max_vertical", "lane_agility_time", "three_quarter_sprint"):
         combine[col] = pd.to_numeric(combine.get(col), errors="coerce")
 
