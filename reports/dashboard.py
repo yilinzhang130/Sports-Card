@@ -80,12 +80,13 @@ def _mispricing_tab() -> None:
     st.dataframe(d["overvalued"], use_container_width=True)
 
 
-def _compute_uplift(stardom_df: "pd.DataFrame") -> "pd.Series":
+def _compute_uplift(stardom_df: pd.DataFrame) -> pd.Series:
     """Counterfactual hedonic_v2 fitted-price uplift (%): predict with
     stardom_premium=row.premium vs. 0 on a stub modern-rookie feature row.
     Returns NaN series if the saved model file is absent."""
     import numpy as np
     import pandas as pd
+
     from sportscards.factors.hedonic import MODEL_PATH, load_model, predict
 
     if not MODEL_PATH.exists():

@@ -265,9 +265,12 @@ def build_features(session: Session) -> pd.DataFrame:
         scores = scores.sort_values("fit_at")
         df = df.sort_values("sold_at").reset_index(drop=True)
         df = pd.merge_asof(
-            df, scores,
-            left_on="sold_at", right_on="fit_at",
-            by="player_id", direction="backward",
+            df,
+            scores,
+            left_on="sold_at",
+            right_on="fit_at",
+            by="player_id",
+            direction="backward",
         )
         df["has_stardom_score"] = df["premium"].notna()
         df = df.rename(columns={"premium": "stardom_premium"})
@@ -277,16 +280,13 @@ def build_features(session: Session) -> pd.DataFrame:
     cohort_mask = (df.get("is_rookie", 0) == 1) & (df.get("era_modern", 0) == 1)
     cohort_median = (
         df.loc[cohort_mask, "stardom_premium"].dropna().astype(float).median()
-        if cohort_mask.any() else 0.0
+        if cohort_mask.any()
+        else 0.0
     )
     if pd.isna(cohort_median):
         cohort_median = 0.0
-    df["stardom_premium"] = (
-        df["stardom_premium"].astype(float).fillna(cohort_median)
-    )
-    df["stardom_premium_x_is_rookie"] = (
-        df["stardom_premium"] * df["is_rookie"].astype(float)
-    )
+    df["stardom_premium"] = df["stardom_premium"].astype(float).fillna(cohort_median)
+    df["stardom_premium_x_is_rookie"] = df["stardom_premium"] * df["is_rookie"].astype(float)
 
     out_cols = [
         # identifiers

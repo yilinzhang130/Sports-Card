@@ -95,14 +95,15 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
 
     score_rows = session.execute(
         _select(
-            _PSS.player_id, _PSS.premium, _PSS.draft_year, _PSS.fit_at,
+            _PSS.player_id,
+            _PSS.premium,
+            _PSS.draft_year,
+            _PSS.fit_at,
         ).where(_PSS.fit_at <= as_of)
     ).all()
     if not score_rows:
         return None
-    scores = pd.DataFrame(
-        score_rows, columns=["player_id", "premium", "draft_year", "fit_at"]
-    )
+    scores = pd.DataFrame(score_rows, columns=["player_id", "premium", "draft_year", "fit_at"])
     scores = scores.sort_values("fit_at").groupby("player_id", as_index=False).tail(1)
     scores = scores[scores["draft_year"] >= as_of.year - 5]
     if scores.empty:
@@ -115,11 +116,9 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
     ).all()
     if not card_rows:
         return None
-    cards = pd.DataFrame(
-        card_rows, columns=["card_id", "player_id", "set_name", "parallel"]
-    )
+    cards = pd.DataFrame(card_rows, columns=["card_id", "player_id", "set_name", "parallel"])
 
-    def _rank(row) -> int:
+    def _rank(row: pd.Series) -> int:
         sn = (row["set_name"] or "").lower()
         par = (row["parallel"] or "").lower()
         if "prizm" in sn and "silver" in par:
@@ -134,13 +133,12 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
     cards = cards[cards["rank"] < 9]
     if cards.empty:
         return None
-    cards = cards.sort_values(["player_id", "rank"]).groupby(
-        "player_id", as_index=False).head(1)
+    cards = cards.sort_values(["player_id", "rank"]).groupby("player_id", as_index=False).head(1)
 
     out = cards.merge(scores, on="player_id", how="inner")
-    return out.rename(
-        columns={"premium": "stardom_score", "fit_at": "computed_at"}
-    )[["player_id", "card_id", "stardom_score", "draft_year", "computed_at"]]
+    return out.rename(columns={"premium": "stardom_score", "fit_at": "computed_at"})[
+        ["player_id", "card_id", "stardom_score", "draft_year", "computed_at"]
+    ]
 
 
 def load_price_panel(
