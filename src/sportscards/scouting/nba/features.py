@@ -107,9 +107,7 @@ def build_feature_matrix(
     for p in POSITIONS:
         merged[f"pos_{p}"] = (pos == p).astype(int)
 
-    origin = (
-        merged["prospect_origin"].fillna(DEFAULT_ORIGIN).astype(str).str.upper()
-    )
+    origin = merged["prospect_origin"].fillna(DEFAULT_ORIGIN).astype(str).str.upper()
     for o in ORIGIN_CATEGORIES:
         merged[f"origin_{o}"] = (origin == o).astype(int)
 

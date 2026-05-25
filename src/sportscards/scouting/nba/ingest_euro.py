@@ -110,9 +110,7 @@ class LiveEuroClient:
             logger.warning("realgm fetch failed for %s/%s: %s", league, season, e)
 
         # Fallback: proballers.com — different URL shape, looser schema.
-        proballers_url = (
-            f"https://www.proballers.com/basketball/league/{league}/{season}"
-        )
+        proballers_url = f"https://www.proballers.com/basketball/league/{league}/{season}"
         time.sleep(self.sleep_s)
         html = requests.get(proballers_url, headers=headers, timeout=30).text
         df = _parse_proballers(html)

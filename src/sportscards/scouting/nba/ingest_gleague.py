@@ -173,9 +173,7 @@ def _first_stats_table(html: str) -> pd.DataFrame:
     return tables[0]
 
 
-def _merge_per_game_and_advanced(
-    per_game: pd.DataFrame, adv: pd.DataFrame
-) -> pd.DataFrame:
+def _merge_per_game_and_advanced(per_game: pd.DataFrame, adv: pd.DataFrame) -> pd.DataFrame:
     """Best-effort join on player name. BR's slug isn't in the rendered HTML
     so we use name + team as the join key; collisions are extremely rare at
     G-League volume.

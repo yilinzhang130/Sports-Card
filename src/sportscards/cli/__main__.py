@@ -442,9 +442,7 @@ def scouting_ingest_nba_cmd(years: tuple[int, ...]) -> None:
 def scouting_ingest_gleague_cmd(seasons: tuple[str, ...]) -> None:
     from sportscards.scouting.nba.ingest_gleague import LiveGLeagueClient, ingest_season
 
-    target = list(seasons) if seasons else [
-        f"{y}-{str(y + 1)[-2:]}" for y in range(2017, 2025)
-    ]
+    target = list(seasons) if seasons else [f"{y}-{str(y + 1)[-2:]}" for y in range(2017, 2025)]
     client = LiveGLeagueClient()
     for s in target:
         click.echo(f"ingesting G-League {s}…")
@@ -475,9 +473,9 @@ def scouting_ingest_euro_cmd(leagues: tuple[str, ...], seasons: tuple[str, ...])
     )
 
     target_leagues = list(leagues) if leagues else list(LEAGUE_IDS.keys())
-    target_seasons = list(seasons) if seasons else [
-        f"{y}-{str(y + 1)[-2:]}" for y in range(2017, 2025)
-    ]
+    target_seasons = (
+        list(seasons) if seasons else [f"{y}-{str(y + 1)[-2:]}" for y in range(2017, 2025)]
+    )
     client = LiveEuroClient()
     for lg in target_leagues:
         for s in target_seasons:

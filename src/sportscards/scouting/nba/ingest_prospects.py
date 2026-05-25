@@ -97,9 +97,7 @@ def build_unified_cohort(
 # ---------------------------------------------------------------------------
 # loaders / converters
 # ---------------------------------------------------------------------------
-def _load_ncaa_safe(
-    years: range, cache_dir: Path
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def _load_ncaa_safe(years: range, cache_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-year tolerant loader. Missing year parquets are skipped with a
     warning so a partial cache (e.g. only 2018 + 2023 in tests) doesn't
     short-circuit the whole cohort.
@@ -164,9 +162,7 @@ def _euro_to_prospects(raw: pd.DataFrame, years: range) -> pd.DataFrame:
     df = raw.copy()
     df["draft_year"] = df["season"].map(_season_to_draft_year)
     df = df[df["draft_year"].isin(list(years))]
-    df["prospect_origin"] = (
-        df["league"].map(LEAGUE_ORIGIN).fillna("OTHER_INTL").astype(str)
-    )
+    df["prospect_origin"] = df["league"].map(LEAGUE_ORIGIN).fillna("OTHER_INTL").astype(str)
     df["years_in_prior_league"] = 1
     df["age_at_draft"] = pd.to_numeric(df.get("age"), errors="coerce")
     return _to_unified(df)
@@ -198,9 +194,7 @@ def _collapse_multi_origin(prospects: pd.DataFrame) -> pd.DataFrame:
     priority = {ORIGIN_NCAA: 0, ORIGIN_GLEAGUE: 1, "EUROLEAGUE": 2}
     df["_prio"] = df["prospect_origin"].map(priority).fillna(3)
     df = df.sort_values(["br_slug", "draft_year", "_prio"]).reset_index(drop=True)
-    counts = (
-        df.groupby(["br_slug", "draft_year"])["prospect_origin"].count().rename("_n")
-    )
+    counts = df.groupby(["br_slug", "draft_year"])["prospect_origin"].count().rename("_n")
     df = df.drop_duplicates(subset=["br_slug", "draft_year"], keep="first")
     df = df.merge(counts, on=["br_slug", "draft_year"], how="left")
     df["years_in_prior_league"] = df["_n"].fillna(1).astype(int)
@@ -222,9 +216,7 @@ def _apply_mle(prospects: pd.DataFrame) -> pd.DataFrame:
     # NOT scaled — shooting efficiency travels league-to-league cleanly.
     for col in SCALED_STATS:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce") * df[
-                "prior_league_mle_score"
-            ]
+            df[col] = pd.to_numeric(df[col], errors="coerce") * df["prior_league_mle_score"]
     return df
 
 
@@ -241,9 +233,7 @@ def _ensure_columns(prospects: pd.DataFrame) -> pd.DataFrame:
         df["prior_league_mle_score"], errors="coerce"
     ).fillna(1.0)
     df["prior_league_strength_rank"] = (
-        pd.to_numeric(df["prior_league_strength_rank"], errors="coerce")
-        .fillna(3)
-        .astype(int)
+        pd.to_numeric(df["prior_league_strength_rank"], errors="coerce").fillna(3).astype(int)
     )
     return df[UNIFIED_PROSPECT_COLUMNS].copy()
 

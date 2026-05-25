@@ -319,7 +319,7 @@ def _populate_caches(
 
     if euro:
         client_e = _DictEuro(euro)
-        for (lg, season) in euro:
+        for lg, season in euro:
             ingest_euro.ingest_league_season(lg, season, client=client_e, cache_dir=euro_dir)
 
     return {"ncaa": ncaa_dir, "gleague": gleague_dir, "euro": euro_dir}
