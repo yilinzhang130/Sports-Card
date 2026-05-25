@@ -43,9 +43,7 @@ def session() -> Session:
 def _add_pop(s: Session, card_id: int, when: datetime, psa8: int, psa9: int, psa10: int) -> None:
     for grade, n in [(Decimal("8"), psa8), (Decimal("9"), psa9), (Decimal("10"), psa10)]:
         s.add(
-            PopSnapshot(
-                snapshot_date=when, card_id=card_id, grader="PSA", grade=grade, pop_count=n
-            )
+            PopSnapshot(snapshot_date=when, card_id=card_id, grader="PSA", grade=grade, pop_count=n)
         )
     s.commit()
 
@@ -85,21 +83,31 @@ def _planted_card(s, card_id, hedonic_p10, hedonic_p9, gem_rate):
     total = 1000
     psa10 = int(gem_rate * total)
     psa9 = total - psa10
-    _add_pop(s, card_id, datetime(2026, 5, 1, tzinfo=UTC),
-             psa8=0, psa9=psa9, psa10=psa10)
+    _add_pop(s, card_id, datetime(2026, 5, 1, tzinfo=UTC), psa8=0, psa9=psa9, psa10=psa10)
 
 
 def _add_raw_comp(s, card_id, price):
-    raw = TxRaw(source="ebay", external_id=f"x-{card_id}-{price}",
-                raw_title=f"raw-{card_id}", raw_price=Decimal(price),
-                sold_at=datetime(2026, 5, 1, tzinfo=UTC))
+    raw = TxRaw(
+        source="ebay",
+        external_id=f"x-{card_id}-{price}",
+        raw_title=f"raw-{card_id}",
+        raw_price=Decimal(price),
+        sold_at=datetime(2026, 5, 1, tzinfo=UTC),
+    )
     s.add(raw)
     s.flush()
-    s.add(TxClean(raw_id=raw.raw_id, card_id=card_id, slab_grader=None,
-                  slab_grade=None, price_usd=Decimal(price),
-                  sold_at=datetime(2026, 5, 1, tzinfo=UTC),
-                  parser_confidence=Decimal("0.90"),
-                  parser_method="regex_raw"))
+    s.add(
+        TxClean(
+            raw_id=raw.raw_id,
+            card_id=card_id,
+            slab_grader=None,
+            slab_grade=None,
+            price_usd=Decimal(price),
+            sold_at=datetime(2026, 5, 1, tzinfo=UTC),
+            parser_confidence=Decimal("0.90"),
+            parser_method="regex_raw",
+        )
+    )
     s.commit()
 
 
@@ -107,8 +115,7 @@ def test_compute_grading_ev_matches_formula(session):
     # gem=0.20, P10=1000, P9=100, cost=24.99 (value_bulk), raw=80
     _planted_card(session, 1, hedonic_p10=1000, hedonic_p9=100, gem_rate=0.20)
     _add_raw_comp(session, 1, "80")
-    ev = compute_grading_ev(session, card_id=1,
-                            as_of=datetime(2026, 5, 1, tzinfo=UTC))
+    ev = compute_grading_ev(session, card_id=1, as_of=datetime(2026, 5, 1, tzinfo=UTC))
     # net P10 = 1000*(1-0.1325)-0.30 = 867.20; net P9 = 100*(1-0.1325)-0.30 = 86.45
     # EV = 0.20*867.20 + 0.80*86.45 − 24.99 − 80 = 173.44 + 69.16 − 104.99 = 137.61
     assert abs(ev.ev - Decimal("137.61")) < Decimal("0.50")
@@ -117,10 +124,28 @@ def test_compute_grading_ev_matches_formula(session):
 
 
 def test_rank_excludes_negative_ev(session):
-    session.add(Card(card_id=2, year=2020, manufacturer="Panini", set_name="Prizm",
-                     card_number="2", parallel="Base", player_id=1))
-    session.add(Card(card_id=3, year=2020, manufacturer="Panini", set_name="Prizm",
-                     card_number="3", parallel="Base", player_id=1))
+    session.add(
+        Card(
+            card_id=2,
+            year=2020,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="2",
+            parallel="Base",
+            player_id=1,
+        )
+    )
+    session.add(
+        Card(
+            card_id=3,
+            year=2020,
+            manufacturer="Panini",
+            set_name="Prizm",
+            card_number="3",
+            parallel="Base",
+            player_id=1,
+        )
+    )
     session.commit()
     _planted_card(session, 2, hedonic_p10=1000, hedonic_p9=100, gem_rate=0.20)
     _add_raw_comp(session, 2, "80")
@@ -138,8 +163,8 @@ def test_rank_excludes_negative_ev(session):
 def test_trend_adjustment_dampens_gem_rate_when_recent_share_drops(session):
     from sportscards.factors.grading_ev import trend_adjustment
 
-    old = datetime(2025, 5, 1, tzinfo=UTC)    # 365d-window start
-    mid = datetime(2026, 2, 1, tzinfo=UTC)    # ~90d ago
+    old = datetime(2025, 5, 1, tzinfo=UTC)  # 365d-window start
+    mid = datetime(2026, 2, 1, tzinfo=UTC)  # ~90d ago
     now = datetime(2026, 5, 1, tzinfo=UTC)
     # Cumulative pop at each snapshot (numbers are TOTAL, not increments):
     #   old: P10=50, P9=50  → snapshot share = 50/100 = 0.50

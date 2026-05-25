@@ -234,13 +234,17 @@ def _raw_clearing_price(
     session: Session, card_id: int, as_of: datetime, window_days: int = 30
 ) -> Decimal | None:
     since = as_of - timedelta(days=window_days)
-    rows = session.execute(
-        select(TxClean.price_usd)
-        .where(TxClean.card_id == card_id)
-        .where(TxClean.slab_grader.is_(None))
-        .where(TxClean.sold_at >= since)
-        .where(TxClean.sold_at <= as_of)
-    ).scalars().all()
+    rows = (
+        session.execute(
+            select(TxClean.price_usd)
+            .where(TxClean.card_id == card_id)
+            .where(TxClean.slab_grader.is_(None))
+            .where(TxClean.sold_at >= since)
+            .where(TxClean.sold_at <= as_of)
+        )
+        .scalars()
+        .all()
+    )
     if not rows:
         return None
     prices = sorted(Decimal(str(p)) for p in rows)
@@ -271,9 +275,7 @@ def compute_grading_ev(
     p10_net = Decimal(str(net_proceeds(float(p10_gross), "ebay", schedule))).quantize(
         Decimal("0.01")
     )
-    p9_net = Decimal(str(net_proceeds(float(p9_gross), "ebay", schedule))).quantize(
-        Decimal("0.01")
-    )
+    p9_net = Decimal(str(net_proceeds(float(p9_gross), "ebay", schedule))).quantize(Decimal("0.01"))
     grade_cost = Decimal(str(cost_to_grade(grade_tier, schedule))).quantize(Decimal("0.01"))
 
     raw = _raw_clearing_price(session, card_id, as_of)
@@ -283,14 +285,17 @@ def compute_grading_ev(
     ).quantize(Decimal("0.01"))
     evpd = (ev / raw).quantize(Decimal("0.0001")) if raw and raw > 0 else None
 
-    p10_pop = session.execute(
-        select(PopSnapshot.pop_count)
-        .where(PopSnapshot.card_id == card_id)
-        .where(PopSnapshot.grader == "PSA")
-        .where(PopSnapshot.grade == Decimal("10"))
-        .order_by(PopSnapshot.snapshot_date.desc())
-        .limit(1)
-    ).scalar_one_or_none() or 0
+    p10_pop = (
+        session.execute(
+            select(PopSnapshot.pop_count)
+            .where(PopSnapshot.card_id == card_id)
+            .where(PopSnapshot.grader == "PSA")
+            .where(PopSnapshot.grade == Decimal("10"))
+            .order_by(PopSnapshot.snapshot_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        or 0
+    )
 
     computed_at = datetime.now(tz=as_of.tzinfo) if as_of.tzinfo else datetime.utcnow()
     return GradingEV(
@@ -324,19 +329,27 @@ def rank_grading_candidates(
     graded copies in the latest pop snapshot.
     """
     since = as_of - timedelta(days=30)
-    cand_ids = session.execute(
-        select(TxClean.card_id)
-        .where(TxClean.slab_grader.is_(None))
-        .where(TxClean.sold_at >= since)
-        .where(TxClean.card_id.is_not(None))
-        .group_by(TxClean.card_id)
-    ).scalars().all()
+    cand_ids = (
+        session.execute(
+            select(TxClean.card_id)
+            .where(TxClean.slab_grader.is_(None))
+            .where(TxClean.sold_at >= since)
+            .where(TxClean.card_id.is_not(None))
+            .group_by(TxClean.card_id)
+        )
+        .scalars()
+        .all()
+    )
 
     rows = []
     for cid in cand_ids:
         try:
             ev = compute_grading_ev(
-                session, cid, as_of, grade_tier=grade_tier, schedule=schedule,
+                session,
+                cid,
+                as_of,
+                grade_tier=grade_tier,
+                schedule=schedule,
                 apply_trend_adjustment=apply_trend_adjustment,
             )
         except ValueError:

@@ -246,9 +246,7 @@ def build_portfolio(
         candidates: pd.DataFrame | None = None
         try:
             with session_scope() as _ga_session:
-                candidates = rank_grading_candidates(
-                    _ga_session, datetime.now(tz=UTC)
-                )
+                candidates = rank_grading_candidates(_ga_session, datetime.now(tz=UTC))
         except Exception:
             logger.warning(
                 "grading_ev sleeve: rank_grading_candidates failed; skipping sleeve",
