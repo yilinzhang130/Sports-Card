@@ -90,6 +90,9 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
     from sportscards.db.models import Card as _Card
     from sportscards.db.models import PlayerStardomScore as _PSS
 
+    if not _has_table(session, "player_stardom_score"):
+        return None
+
     score_rows = session.execute(
         _select(
             _PSS.player_id, _PSS.premium, _PSS.draft_year, _PSS.fit_at,

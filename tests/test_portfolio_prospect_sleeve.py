@@ -73,3 +73,21 @@ def test_load_stardom_excludes_outside_rookie_window(session):
 def test_load_stardom_returns_none_when_empty(session):
     assert load_stardom(
         session, as_of=datetime(2026, 1, 1, tzinfo=timezone.utc)) is None
+
+
+def test_load_stardom_returns_none_when_table_missing():
+    """If player_stardom_score table doesn't exist (fresh DB / migrations not
+    run), load_stardom returns None rather than raising."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    # Build a DB with only Card/Player tables, not PlayerStardomScore.
+    from sportscards.db.models import Card, Player
+    eng = create_engine("sqlite:///:memory:")
+    Card.__table__.create(eng)
+    Player.__table__.create(eng)
+    s = Session(eng)
+    try:
+        assert load_stardom(
+            s, as_of=datetime(2026, 1, 1, tzinfo=timezone.utc)) is None
+    finally:
+        s.close()
