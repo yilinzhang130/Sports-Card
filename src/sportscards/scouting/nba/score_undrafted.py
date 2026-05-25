@@ -171,7 +171,7 @@ def persist_prospect_forecast(
         session.add(
             ProspectForecast(
                 player_slug=str(r.br_slug),
-                draft_year=int(r.draft_year),
+                draft_year=int(float(str(r.draft_year))),
                 model_version=model_version,
                 as_of_date=r.as_of_date,
                 name=str(r.player_name),
@@ -180,7 +180,7 @@ def persist_prospect_forecast(
                 consensus_rank=_maybe_decimal(r.consensus_rank, "0.01"),
                 sources_count=_maybe_int(r.sources_count),
                 is_underclassman=bool(r.is_underclassman),
-                years_until_draft=int(r.years_until_draft),
+                years_until_draft=int(float(str(r.years_until_draft))),
                 prior_league=str(r.prior_league or "NCAA"),
                 n_games_played=_maybe_int(r.n_games_played),
                 fit_at=now,

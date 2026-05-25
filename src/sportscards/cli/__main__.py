@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -596,7 +596,7 @@ def scouting_top_prospects_cmd(draft_year: int, limit: int) -> None:
     console.print(table)
 
 
-def func_max_as_of_date():
+def func_max_as_of_date() -> Any:
     """Indirection — keeps the heavy ``func`` import out of the import-time
     surface of this module's CLI loader. Returns ``MAX(as_of_date)`` over
     ``prospect_forecast`` (caller chains its own WHERE).
