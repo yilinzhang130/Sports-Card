@@ -813,7 +813,7 @@ def dashboard_cmd() -> None:
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[3]
-    app = repo_root / "reports" / "dashboard.py"
+    app = repo_root / "reports" / "app" / "Home.py"
     subprocess.run(["streamlit", "run", str(app)], check=False)
 
 
