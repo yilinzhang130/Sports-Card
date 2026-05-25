@@ -178,7 +178,6 @@ def _apply_tactical_tilt(
 
         # Preserve sign — shorts are negative; tilt by absolute magnitude
         sign = -1.0 if sleeve == "factor_short" else 1.0
-        original_total = sum(p.target_weight_pct for p in sleeve_positions)
 
         # Rank by score; missing → 0.0
         scored = [
@@ -267,8 +266,6 @@ def _apply_tactical_tilt(
                     target_usd_value=signed_w * aum,
                 )
             )
-        # original_total recorded for potential audit; intentionally not asserted
-        _ = original_total
 
     return out
 
