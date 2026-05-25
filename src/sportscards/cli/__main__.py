@@ -427,7 +427,9 @@ def factor() -> None:
 @click.option("--lookback", default=90, type=int, help="Trailing window in days.")
 def factor_compute_panel_cmd(as_of: str | None, lookback: int) -> None:
     """Compute and persist factor_panel rows for the universe."""
-    from datetime import UTC, date as _date, datetime as _datetime
+    from datetime import UTC
+    from datetime import date as _date
+    from datetime import datetime as _datetime
 
     from sportscards.db.session import session_scope
     from sportscards.factors.factor_panel import persist_panel

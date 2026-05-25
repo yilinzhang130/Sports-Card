@@ -9,6 +9,7 @@ should avoid.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -32,10 +33,8 @@ def _to_naive(ts: pd.Series) -> pd.Series:
 
 def _as_of_ts(as_of: date | datetime | pd.Timestamp) -> pd.Timestamp:
     ts = pd.Timestamp(as_of)
-    try:
+    with contextlib.suppress(TypeError, AttributeError):
         ts = ts.tz_localize(None)
-    except (TypeError, AttributeError):
-        pass
     return ts
 
 
@@ -96,8 +95,6 @@ def _trailing_return(
     if volume_weight:
         w = in_window["n_sales"].to_numpy(dtype=float)
         prices = in_window["median_price"].to_numpy(dtype=float)
-        first_idx = 0
-        last_idx = len(in_window) - 1
         # weighted average of first/last few buckets — soften single-print noise
         k = min(2, len(in_window) // 2 or 1)
         start = float(np.average(prices[:k], weights=w[:k]))

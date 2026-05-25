@@ -80,7 +80,9 @@ def _seed_card_with_return(
 
 def test_top_decile_card_ranked_in_top_decile(session):
     # 9 flat cards (return ~0%) and 1 winner (+50%)
-    flat_ids = [_seed_card_with_return(session, f"flat{i}", f"f{i}", 100.0, 100.0) for i in range(9)]
+    flat_ids = [
+        _seed_card_with_return(session, f"flat{i}", f"f{i}", 100.0, 100.0) for i in range(9)
+    ]
     winner = _seed_card_with_return(session, "win", "w1", 100.0, 150.0)
     session.commit()
 
@@ -90,9 +92,9 @@ def test_top_decile_card_ranked_in_top_decile(session):
     assert win_row["cs_momentum_pct"] >= 0.9, panel
     # All flats should rank below the winner
     for fid in flat_ids:
-        assert panel[panel["card_id"] == fid].iloc[0]["cs_momentum_pct"] <= win_row[
-            "cs_momentum_pct"
-        ]
+        assert (
+            panel[panel["card_id"] == fid].iloc[0]["cs_momentum_pct"] <= win_row["cs_momentum_pct"]
+        )
 
 
 def test_hyped_flag_set_when_r7_more_than_double_r30(session):

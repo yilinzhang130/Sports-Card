@@ -106,9 +106,7 @@ def _equal_weight_with_cap(
     return positions, max(remaining, 0.0)
 
 
-def _apply_liquidity_hype_filters(
-    factor_df: pd.DataFrame, *, drop_hyped: bool
-) -> pd.DataFrame:
+def _apply_liquidity_hype_filters(factor_df: pd.DataFrame, *, drop_hyped: bool) -> pd.DataFrame:
     """Drop tier-D rows always; drop hyped rows when ``drop_hyped`` (long side)."""
     if factor_df.empty:
         return factor_df
@@ -180,12 +178,7 @@ def _momentum_tilt(
         )
     weights_map: dict[int, float] = {}
     sub = factor_df[factor_df["card_id"].isin(card_ids)]
-    raw = (
-        sub.set_index("card_id")["cs_momentum_pct"]
-        .astype(float)
-        .reindex(card_ids)
-        .fillna(0.5)
-    )
+    raw = sub.set_index("card_id")["cs_momentum_pct"].astype(float).reindex(card_ids).fillna(0.5)
     if raw.sum() <= 0:
         return _equal_weight_with_cap(
             card_ids, sleeve_weight, per_name_cap, sleeve_label, aum, signal_source
@@ -204,9 +197,7 @@ def _momentum_tilt(
         eligible = [cid for cid in card_ids if weights_map[cid] < per_name_cap - 1e-12]
         if not eligible:
             break
-        elig_raw = np.array(
-            [float(raw[cid]) if raw[cid] > 0 else 1e-9 for cid in eligible]
-        )
+        elig_raw = np.array([float(raw[cid]) if raw[cid] > 0 else 1e-9 for cid in eligible])
         total = elig_raw.sum()
         progressed = False
         for cid, r in zip(eligible, elig_raw, strict=True):

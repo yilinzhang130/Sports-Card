@@ -5,6 +5,7 @@ Recompute is intended weekly: the signals are slow.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -19,10 +20,8 @@ from sportscards.factors.momentum import compute_cs_momentum
 
 def _as_of_ts(as_of: date | datetime | pd.Timestamp) -> pd.Timestamp:
     ts = pd.Timestamp(as_of)
-    try:
+    with contextlib.suppress(TypeError, AttributeError):
         ts = ts.tz_localize(None)
-    except (TypeError, AttributeError):
-        pass
     return ts
 
 
@@ -64,9 +63,7 @@ def persist_panel(
         return 0
 
     # Replace existing rows for this as_of_date
-    session.execute(
-        delete(FactorPanel).where(FactorPanel.as_of_date == as_of_ts.to_pydatetime())
-    )
+    session.execute(delete(FactorPanel).where(FactorPanel.as_of_date == as_of_ts.to_pydatetime()))
 
     n = 0
     for row in df.itertuples(index=False):
@@ -77,17 +74,13 @@ def persist_panel(
                 r30=_dec(getattr(row, "r30", None)),
                 r90=_dec(getattr(row, "r90", None)),
                 r365=_dec(getattr(row, "r365", None)),
-                cs_momentum_pct=_dec(
-                    getattr(row, "cs_momentum_pct", None), q="0.0001"
-                ),
+                cs_momentum_pct=_dec(getattr(row, "cs_momentum_pct", None), q="0.0001"),
                 is_hyped=bool(getattr(row, "is_hyped", False)),
                 sales_count_90d=int(row.sales_count_90d),
                 dollar_volume_90d=_dec(row.dollar_volume_90d, q="0.01"),
                 bid_ask_proxy=_dec(row.bid_ask_proxy, q="0.00001"),
                 last_sale_recency_days=(
-                    None
-                    if pd.isna(row.last_sale_recency_days)
-                    else int(row.last_sale_recency_days)
+                    None if pd.isna(row.last_sale_recency_days) else int(row.last_sale_recency_days)
                 ),
                 liquidity_tier=str(row.liquidity_tier),
             )

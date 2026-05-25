@@ -9,6 +9,7 @@ quality).
 
 from __future__ import annotations
 
+import contextlib
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -34,10 +35,8 @@ def _to_naive(ts: pd.Series) -> pd.Series:
 
 def _as_of_ts(as_of: date | datetime | pd.Timestamp) -> pd.Timestamp:
     ts = pd.Timestamp(as_of)
-    try:
+    with contextlib.suppress(TypeError, AttributeError):
         ts = ts.tz_localize(None)
-    except (TypeError, AttributeError):
-        pass
     return ts
 
 
@@ -75,25 +74,19 @@ def _load_tx_panel(
     return df.dropna(subset=["sold_at", "price_usd"])
 
 
-def _last_sale_recency(
-    session: Session, as_of: pd.Timestamp, card_id: int
-) -> int | None:
+def _last_sale_recency(session: Session, as_of: pd.Timestamp, card_id: int) -> int | None:
     """Days since the last sale for ``card_id`` (None if no sales ever)."""
     from sqlalchemy import func
 
     row = session.execute(
-        select(func.max(TxClean.sold_at)).where(
-            TxClean.card_id == card_id, TxClean.sold_at < as_of
-        )
+        select(func.max(TxClean.sold_at)).where(TxClean.card_id == card_id, TxClean.sold_at < as_of)
     ).one()
     last = row[0]
     if last is None:
         return None
     last_ts = pd.Timestamp(last)
-    try:
+    with contextlib.suppress(TypeError, AttributeError):
         last_ts = last_ts.tz_localize(None)
-    except (TypeError, AttributeError):
-        pass
     delta = (as_of - last_ts).days
     return max(0, int(delta))
 
@@ -114,8 +107,8 @@ def liquidity_metrics(
     as_of_ts = _as_of_ts(as_of)
     df = _load_tx_panel(session, as_of_ts, window_days, card_ids=[card_id])
     sales_count = int(len(df))
-    dollar_volume = Decimal(str(round(float(df["price_usd"].sum()), 2))) if sales_count else Decimal(
-        "0.00"
+    dollar_volume = (
+        Decimal(str(round(float(df["price_usd"].sum()), 2))) if sales_count else Decimal("0.00")
     )
 
     bid_ask: Decimal | None = None
@@ -173,9 +166,7 @@ def compute_liquidity_panel(
         )
 
     as_of_ts = _as_of_ts(as_of)
-    df = _load_tx_panel(
-        session, as_of_ts, window_days, card_ids=universe_card_ids
-    )
+    df = _load_tx_panel(session, as_of_ts, window_days, card_ids=universe_card_ids)
 
     # Aggregate sales count + dollar volume per card
     if df.empty:

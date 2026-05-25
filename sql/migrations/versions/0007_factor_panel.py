@@ -8,6 +8,7 @@ Chained after 0006_prospect_forecast which landed on main while this
 branch was open.
 """
 
+import contextlib
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -46,19 +47,15 @@ def upgrade() -> None:
         ),
     )
     op.create_index("ix_factor_panel_as_of", "factor_panel", ["as_of_date"])
-    op.create_index(
-        "ix_factor_panel_card_asof", "factor_panel", ["card_id", "as_of_date"]
-    )
+    op.create_index("ix_factor_panel_card_asof", "factor_panel", ["card_id", "as_of_date"])
     # TimescaleDB hypertable on as_of_date (no-op on non-Timescale backends).
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
-        try:
+        with contextlib.suppress(Exception):
             op.execute(
                 "SELECT create_hypertable('factor_panel', 'as_of_date', "
                 "if_not_exists => TRUE, migrate_data => TRUE)"
             )
-        except Exception:
-            pass
 
 
 def downgrade() -> None:
