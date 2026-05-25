@@ -38,6 +38,12 @@ scouting-live = [
     # the test suite does not require this dep.
     "basketball-reference-scraper>=1.0.6",
 ]
+events-live = [
+    # Pulled only for the live NBA catalyst-event ingest path (injuries,
+    # schedule, awards, transactions). Tests inject fake clients so the test
+    # suite does not require this dep.
+    "nba_api>=1.4",
+]
 
 [project.scripts]
 sportscards = "sportscards.cli.__main__:main"
