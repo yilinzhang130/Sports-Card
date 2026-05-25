@@ -51,6 +51,26 @@ def _cached_forward_prospects() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
+def _cached_top_catalysts() -> pd.DataFrame:
+    return queries.top_catalysts(days=30, limit=10)
+
+
+@st.cache_data(ttl=300)
+def _cached_recent_events() -> pd.DataFrame:
+    return queries.recent_events(days=30, limit=100)
+
+
+@st.cache_data(ttl=300)
+def _cached_catalyst_sparkline(player_id: int) -> pd.DataFrame:
+    return queries.player_catalyst_sparkline(player_id)
+
+
+@st.cache_data(ttl=300)
+def _cached_grading_ev() -> pd.DataFrame:
+    return queries.grading_ev_leaderboard()
+
+
+@st.cache_data(ttl=300)
 def _cached_factor_panel() -> pd.DataFrame:
     return queries.factor_panel_latest()
 
@@ -188,6 +208,46 @@ def _prospects_tab() -> None:
             st.plotly_chart(fig, use_container_width=True)
 
 
+def _catalysts_tab() -> None:
+    st.header("Catalysts")
+    try:
+        top = _cached_top_catalysts()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    st.subheader("Top 10 catalysts (last 30 days)")
+    st.dataframe(top, use_container_width=True)
+
+    st.subheader("Recent events")
+    try:
+        events = _cached_recent_events()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    st.dataframe(events, use_container_width=True)
+
+    st.subheader("Player catalyst sparkline")
+    if top.empty:
+        st.write("No catalyst-scored players in the window.")
+        return
+    chosen = st.selectbox("Player", options=top["player_name"].tolist(), key="catalyst_player")
+    if chosen:
+        pid = int(top.loc[top["player_name"] == chosen, "player_id"].iloc[0])
+        try:
+            spark = _cached_catalyst_sparkline(pid)
+        except TableMissing as e:
+            _placeholder(e.phase)
+            return
+        if not spark.empty:
+            fig = px.line(
+                spark,
+                x="as_of",
+                y="catalyst_score",
+                title=f"{chosen} — catalyst score",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+
 def _forward_prospects_tab() -> None:
     st.header("Forward Prospects")
     st.caption(
@@ -213,6 +273,76 @@ def _forward_prospects_tab() -> None:
     st.dataframe(df, use_container_width=True)
 
 
+def _catalysts_tab() -> None:
+    st.header("Catalysts")
+    try:
+        top = _cached_top_catalysts()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    st.subheader("Top 10 catalysts (last 30 days)")
+    st.dataframe(top, use_container_width=True)
+
+    st.subheader("Recent events")
+    try:
+        events = _cached_recent_events()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    st.dataframe(events, use_container_width=True)
+
+    st.subheader("Player catalyst sparkline")
+    if top.empty:
+        st.write("No catalyst-scored players in the window.")
+        return
+    chosen = st.selectbox("Player", options=top["player_name"].tolist(), key="catalyst_player")
+    if chosen:
+        pid = int(top.loc[top["player_name"] == chosen, "player_id"].iloc[0])
+        try:
+            spark = _cached_catalyst_sparkline(pid)
+        except TableMissing as e:
+            _placeholder(e.phase)
+            return
+        if not spark.empty:
+            fig = px.line(
+                spark,
+                x="as_of",
+                y="catalyst_score",
+                title=f"{chosen} — catalyst score",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+
+def _grading_ev_tab() -> None:
+    st.header("Grading EV — raw → PSA 10 optionality")
+    try:
+        df = _cached_grading_ev()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Grading EV unavailable: {e}")
+        return
+    if df.empty:
+        st.write("No grading-EV rows yet — run `sportscards ev compute`.")
+        return
+
+    def _highlight(v):
+        if pd.isna(v):
+            return ""
+        if v > 0.30:
+            return "background-color: #d4edda"
+        if v < 0:
+            return "background-color: #f8d7da"
+        return ""
+
+    st.dataframe(
+        df.style.map(_highlight, subset=["ev_per_dollar"]),
+        use_container_width=True,
+    )
+    st.caption("Small sample_size = noisier gem_rate estimate; treat <20 as speculative.")
+
+
 def _factor_tab() -> None:
     st.header("Factor Panel — Momentum + Liquidity")
     try:
@@ -232,8 +362,18 @@ def _factor_tab() -> None:
 
 # --- render ------------------------------------------------------------------
 
-tab_index, tab_mispricing, tab_prospects, tab_forward, tab_factor = st.tabs(
-    ["Index", "Mispricing", "Prospects", "Forward Prospects", "Factor Panel"]
+tab_index, tab_mispricing, tab_prospects, tab_forward, tab_catalysts, tab_factor, tab_grading = (
+    st.tabs(
+        [
+            "Index",
+            "Mispricing",
+            "Prospects",
+            "Forward Prospects",
+            "Catalysts",
+            "Factor Panel",
+            "Grading EV",
+        ]
+    )
 )
 with tab_index:
     _market_tab()
@@ -243,5 +383,9 @@ with tab_prospects:
     _prospects_tab()
 with tab_forward:
     _forward_prospects_tab()
+with tab_catalysts:
+    _catalysts_tab()
 with tab_factor:
     _factor_tab()
+with tab_grading:
+    _grading_ev_tab()

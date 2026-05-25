@@ -48,8 +48,10 @@ NUMERICAL_FEATURES: list[str] = [
     "bid_ask_proxy",  #  0 (illiquid premium is ambiguous)
     "stardom_premium",  # +1: more stardom → higher price
     "stardom_premium_x_is_rookie",  # +1: amplified for rookies
+    "catalyst_score",  #  0 (context-dependent; can flip sign)
+    "catalyst_score_30d_change",  #  0
 ]
-NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, +1, 0, 0, +1, +1)
+NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, +1, 0, 0, +1, +1, 0, 0)
 
 BOOLEAN_FEATURES: list[str] = [
     "is_rookie",

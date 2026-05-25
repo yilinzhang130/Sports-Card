@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
@@ -201,6 +202,70 @@ class TxMispricing(Base):
     __table_args__ = (Index("ix_tx_mispricing_residual", "residual"),)
 
 
+class PlayerEventType(StrEnum):
+    """Allowed `event_type` values for `player_events`.
+
+    Validated in application code, not enforced at the DB level (the column is a
+    plain VARCHAR(32) for forward-compat with future event categories).
+    """
+
+    # Injuries
+    INJURY_OUT = "injury_out"
+    INJURY_DTD = "injury_dtd"
+    INJURY_RETURN = "injury_return"
+
+    # Playoffs
+    PLAYOFF_WIN = "playoff_win"
+    PLAYOFF_SERIES_WIN = "playoff_series_win"
+    PLAYOFF_FINALS_WIN = "playoff_finals_win"
+
+    # Awards
+    MVP = "mvp"
+    ROY = "roy"
+    DPOY = "dpoy"
+    ALL_STAR = "all_star"
+    ALL_NBA_1ST = "all_nba_1st"
+    ALL_NBA_2ND = "all_nba_2nd"
+    ALL_NBA_3RD = "all_nba_3rd"
+    HOF = "hof"
+
+    # Transactions
+    CALL_UP = "call_up"
+    TWO_WAY = "two_way"
+    TRADED = "traded"
+    SIGNED = "signed"
+
+
+class PlayerEvent(Base):
+    """Catalyst events keyed by player.
+
+    Re-running an ingestor for the same (player, event_type, event_date) is a
+    no-op thanks to `uq_player_events_dedupe`.
+    """
+
+    __tablename__ = "player_events"
+
+    event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    player_id: Mapped[int] = mapped_column(ForeignKey("player_master.player_id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    event_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    event_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "player_id",
+            "event_type",
+            "event_date",
+            name="uq_player_events_dedupe",
+        ),
+        Index("ix_player_events_player_date", "player_id", "event_date"),
+        Index("ix_player_events_event_date", "event_date"),
+    )
+
+
 class FactorPanel(Base):
     """Per-card momentum + liquidity factor snapshot. Timescale hypertable on as_of_date."""
 
@@ -316,3 +381,27 @@ class AuditLog(Base):
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class GradingEv(Base):
+    """TimescaleDB hypertable on as_of_date — daily grading optionality EVs."""
+
+    __tablename__ = "grading_ev"
+
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), primary_key=True)
+    as_of_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    grade_tier: Mapped[str] = mapped_column(String(16), primary_key=True)
+    gem_rate: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    p10_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    p9_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    cost_to_grade: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
+    raw_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    ev: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    ev_per_dollar: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    sample_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    p10_pop: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_grading_ev_ev_per_dollar", "ev_per_dollar"),)
