@@ -6,6 +6,7 @@ Create Date: 2026-05-24
 
 """
 
+import contextlib
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -18,7 +19,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb")
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        with contextlib.suppress(Exception):
+            op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb")
 
     op.create_table(
         "player_master",
@@ -124,7 +128,11 @@ def upgrade() -> None:
         sa.Column("grade", sa.Numeric(4, 1), primary_key=True),
         sa.Column("pop_count", sa.Integer, nullable=False),
     )
-    op.execute("SELECT create_hypertable('pop_snapshots', 'snapshot_date', if_not_exists => TRUE)")
+    if bind.dialect.name == "postgresql":
+        with contextlib.suppress(Exception):
+            op.execute(
+                "SELECT create_hypertable('pop_snapshots', 'snapshot_date', if_not_exists => TRUE)"
+            )
 
 
 def downgrade() -> None:

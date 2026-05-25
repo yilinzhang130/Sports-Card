@@ -18,6 +18,10 @@ from __future__ import annotations
 
 import logging
 import warnings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 from dataclasses import dataclass
 from datetime import UTC
 from typing import Literal
@@ -74,6 +78,7 @@ class TargetPosition:
     target_weight_pct: float
     target_usd_value: float
     signal_source: str  # "anchor" | "factor" | "prospect"
+    is_override: bool = False
 
 
 def _equal_weight_with_cap(
@@ -515,3 +520,50 @@ def build_portfolio(
 
 def total_long_weight(positions: list[TargetPosition]) -> float:
     return sum(p.target_weight_pct for p in positions if p.target_weight_pct > 0)
+
+
+def apply_overrides(positions: list[TargetPosition], session: Session) -> list[TargetPosition]:
+    """Replace target_weight_pct on positions whose card_id has an override row.
+
+    Degrades gracefully — if portfolio_overrides table is missing, returns
+    positions unchanged. Each override emits a warning via the standard
+    ``warnings`` module so the CLI/UI can surface it.
+    """
+    import warnings as _w
+    from dataclasses import replace
+    from decimal import Decimal  # noqa: F401
+
+    from sqlalchemy import inspect as _inspect
+
+    from sportscards.db.models import PortfolioOverride
+
+    bind = session.bind
+    if bind is None or not _inspect(bind).has_table("portfolio_overrides"):
+        return positions
+
+    rows = {r.card_id: r for r in session.query(PortfolioOverride).all()}
+    if not rows:
+        return positions
+
+    out: list[TargetPosition] = []
+    for p in positions:
+        if p.card_id in rows:
+            new_weight = float(rows[p.card_id].target_weight_pct)
+            _w.warn(
+                f"override applied: card_id={p.card_id} "
+                f"model_weight={p.target_weight_pct:.4f} → override={new_weight:.4f}",
+                stacklevel=2,
+            )
+            out.append(
+                replace(
+                    p,
+                    target_weight_pct=new_weight,
+                    target_usd_value=new_weight * (p.target_usd_value / p.target_weight_pct)
+                    if p.target_weight_pct != 0
+                    else 0.0,
+                    is_override=True,
+                )
+            )
+        else:
+            out.append(p)
+    return out

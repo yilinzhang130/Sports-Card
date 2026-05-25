@@ -193,12 +193,15 @@ def test_catalyst_queries_raise_when_table_missing():
         queries.player_catalyst_sparkline(player_id=1, engine=engine)
 
 
-def test_dashboard_imports_cleanly():
-    """The Streamlit dashboard module imports without executing Streamlit calls."""
+def test_app_components_import_cleanly():
+    """The multi-page app components import without executing Streamlit calls."""
     repo_root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repo_root))
     try:
-        mod = importlib.import_module("reports.dashboard")
+        auth = importlib.import_module("reports.app._components.auth")
+        ui = importlib.import_module("reports.app._components.ui")
     finally:
         sys.path.remove(str(repo_root))
-    assert hasattr(mod, "render_dashboard")
+    assert hasattr(auth, "guard_localhost")
+    assert hasattr(ui, "confirm_toggle")
+    assert hasattr(ui, "job_badge")

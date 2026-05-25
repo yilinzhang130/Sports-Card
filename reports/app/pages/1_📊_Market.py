@@ -1,6 +1,7 @@
-"""Read-only Streamlit dashboard for sportscards-quant.
+"""Market — read-only views ported from the legacy single-file dashboard.
 
-Run with: `streamlit run reports/dashboard.py` or `sportscards dashboard`.
+Tabs: Index, Mispricing, Prospects, Forward Prospects, Factor Panel.
+(Data Health lives on Home.py.)
 """
 
 from __future__ import annotations
@@ -9,8 +10,19 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from reports.app._components.auth import guard_localhost
+from reports.app._components.ui import job_badge
 from sportscards.reports import queries
 from sportscards.reports.queries import TableMissing
+
+st.set_page_config(page_title="Market", page_icon="📊", layout="wide")
+guard_localhost()
+job_badge()
+
+st.title("📊 Market")
+
+
+# --- cached query wrappers ---------------------------------------------------
 
 
 @st.cache_data(ttl=300)
@@ -39,11 +51,6 @@ def _cached_forward_prospects() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
-def _cached_backtest() -> pd.DataFrame:
-    return queries.backtest_nav()
-
-
-@st.cache_data(ttl=300)
 def _cached_top_catalysts() -> pd.DataFrame:
     return queries.top_catalysts(days=30, limit=10)
 
@@ -56,11 +63,6 @@ def _cached_recent_events() -> pd.DataFrame:
 @st.cache_data(ttl=300)
 def _cached_catalyst_sparkline(player_id: int) -> pd.DataFrame:
     return queries.player_catalyst_sparkline(player_id)
-
-
-@st.cache_data(ttl=300)
-def _cached_health() -> dict[str, pd.DataFrame]:
-    return queries.data_health()
 
 
 @st.cache_data(ttl=300)
@@ -77,12 +79,18 @@ def _placeholder(phase: str) -> None:
     st.info(f"Coming with {phase}.")
 
 
+# --- tab implementations (verbatim from legacy dashboard) --------------------
+
+
 def _market_tab() -> None:
     st.header("Market Overview")
     try:
         df = _cached_index()
     except TableMissing as e:
         _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Index unavailable: {e}")
         return
     if df.empty:
         st.write("No index data yet.")
@@ -103,6 +111,9 @@ def _mispricing_tab() -> None:
         d = _cached_mispricing()
     except TableMissing as e:
         _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Mispricing data unavailable: {e}")
         return
     st.subheader("Top 20 Undervalued (positive residual)")
     st.dataframe(d["undervalued"], use_container_width=True)
@@ -163,12 +174,15 @@ def _stub_feature_row() -> dict:
     }
 
 
-def _prospect_tab() -> None:
+def _prospects_tab() -> None:
     st.header("Prospect Board")
     try:
         df = _cached_stardom()
     except TableMissing as e:
         _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Prospect data unavailable: {e}")
         return
     if df.empty:
         st.write("No stardom scores yet.")
@@ -246,6 +260,9 @@ def _forward_prospects_tab() -> None:
     except TableMissing as e:
         _placeholder(e.phase)
         return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Forward prospects data unavailable: {e}")
+        return
     if df.empty:
         st.info(
             "No forecasts yet. Run "
@@ -256,18 +273,44 @@ def _forward_prospects_tab() -> None:
     st.dataframe(df, use_container_width=True)
 
 
-def _portfolio_tab() -> None:
-    st.header("Portfolio")
+def _catalysts_tab() -> None:
+    st.header("Catalysts")
     try:
-        nav = _cached_backtest()
+        top = _cached_top_catalysts()
     except TableMissing as e:
         _placeholder(e.phase)
         return
-    if nav.empty:
-        st.write("No backtest runs yet.")
+    st.subheader("Top 10 catalysts (last 30 days)")
+    st.dataframe(top, use_container_width=True)
+
+    st.subheader("Recent events")
+    try:
+        events = _cached_recent_events()
+    except TableMissing as e:
+        _placeholder(e.phase)
         return
-    fig = px.line(nav, x="as_of", y="nav", title="Latest Backtest NAV")
-    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(events, use_container_width=True)
+
+    st.subheader("Player catalyst sparkline")
+    if top.empty:
+        st.write("No catalyst-scored players in the window.")
+        return
+    chosen = st.selectbox("Player", options=top["player_name"].tolist(), key="catalyst_player")
+    if chosen:
+        pid = int(top.loc[top["player_name"] == chosen, "player_id"].iloc[0])
+        try:
+            spark = _cached_catalyst_sparkline(pid)
+        except TableMissing as e:
+            _placeholder(e.phase)
+            return
+        if not spark.empty:
+            fig = px.line(
+                spark,
+                x="as_of",
+                y="catalyst_score",
+                title=f"{chosen} — catalyst score",
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 
 def _grading_ev_tab() -> None:
@@ -276,6 +319,9 @@ def _grading_ev_tab() -> None:
         df = _cached_grading_ev()
     except TableMissing as e:
         _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Grading EV unavailable: {e}")
         return
     if df.empty:
         st.write("No grading-EV rows yet — run `sportscards ev compute`.")
@@ -297,12 +343,15 @@ def _grading_ev_tab() -> None:
     st.caption("Small sample_size = noisier gem_rate estimate; treat <20 as speculative.")
 
 
-def _factor_panel_tab() -> None:
+def _factor_tab() -> None:
     st.header("Factor Panel — Momentum + Liquidity")
     try:
         df = _cached_factor_panel()
     except TableMissing as e:
         _placeholder(e.phase)
+        return
+    except Exception as e:  # pragma: no cover — defensive
+        st.info(f"Factor panel data unavailable: {e}")
         return
     if df.empty:
         st.write("No factor_panel snapshot yet. Run `sportscards factor compute-panel`.")
@@ -311,55 +360,32 @@ def _factor_panel_tab() -> None:
     st.dataframe(df, use_container_width=True)
 
 
-def _health_tab() -> None:
-    st.header("Data Health")
-    try:
-        h = _cached_health()
-    except TableMissing as e:
-        _placeholder(e.phase)
-        return
-    st.subheader("Raw vs. Clean rows (last 30 days)")
-    st.dataframe(h["raw_vs_clean"], use_container_width=True)
-    st.subheader("Parse failures (cumulative)")
-    st.metric("failures", int(h["failures"]["n"].iloc[0]))
-    st.caption("PSA quota tracking: pending instrumentation.")
+# --- render ------------------------------------------------------------------
 
-
-def render_dashboard() -> None:
-    st.set_page_config(page_title="sportscards-quant", layout="wide")
-    st.title("sportscards-quant")
-    tabs = st.tabs(
+tab_index, tab_mispricing, tab_prospects, tab_forward, tab_catalysts, tab_factor, tab_grading = (
+    st.tabs(
         [
-            "Market",
+            "Index",
             "Mispricing",
             "Prospects",
             "Forward Prospects",
             "Catalysts",
-            "Portfolio",
-            "Factor panel",
+            "Factor Panel",
             "Grading EV",
-            "Data Health",
         ]
     )
-    with tabs[0]:
-        _market_tab()
-    with tabs[1]:
-        _mispricing_tab()
-    with tabs[2]:
-        _prospect_tab()
-    with tabs[3]:
-        _forward_prospects_tab()
-    with tabs[4]:
-        _catalysts_tab()
-    with tabs[5]:
-        _portfolio_tab()
-    with tabs[6]:
-        _factor_panel_tab()
-    with tabs[7]:
-        _grading_ev_tab()
-    with tabs[8]:
-        _health_tab()
-
-
-if __name__ == "__main__":
-    render_dashboard()
+)
+with tab_index:
+    _market_tab()
+with tab_mispricing:
+    _mispricing_tab()
+with tab_prospects:
+    _prospects_tab()
+with tab_forward:
+    _forward_prospects_tab()
+with tab_catalysts:
+    _catalysts_tab()
+with tab_factor:
+    _factor_tab()
+with tab_grading:
+    _grading_ev_tab()

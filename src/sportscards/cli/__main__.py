@@ -214,6 +214,7 @@ def portfolio_plan_cmd(aum: float, grading_arbitrage_pct: float, tactical: bool)
     from sportscards.portfolio.construction import (
         AllocationConfig,
         UniverseSnapshot,
+        apply_overrides,
         build_portfolio,
     )
 
@@ -234,33 +235,40 @@ def portfolio_plan_cmd(aum: float, grading_arbitrage_pct: float, tactical: bool)
                 if stardom is not None and not stardom.empty:
                     ids.update(int(x) for x in stardom["card_id"].tolist())
                 catalyst_scores = load_catalyst_scores(s, sorted(ids), now.to_pydatetime())
-        positions = build_portfolio(
-            UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
-            AllocationConfig(
-                total_aum_usd=aum,
-                grading_arbitrage_weight=grading_arbitrage_pct / 100.0,
-                tactical_tilt=tactical,
-            ),
-            catalyst_scores=catalyst_scores,
-        )
+            positions = build_portfolio(
+                UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
+                AllocationConfig(
+                    total_aum_usd=aum,
+                    grading_arbitrage_weight=grading_arbitrage_pct / 100.0,
+                    tactical_tilt=tactical,
+                ),
+                catalyst_scores=catalyst_scores,
+            )
+            positions = apply_overrides(positions, s)
 
     console = Console()
     for w_ in caught:
         console.print(f"[yellow]warning:[/yellow] {w_.message}")
+    has_overrides = any(p.is_override for p in positions)
     table = Table(title=f"Target portfolio (AUM ${aum:,.0f})")
     table.add_column("card_id", justify="right")
     table.add_column("sleeve")
     table.add_column("signal_source")
     table.add_column("weight %", justify="right")
     table.add_column("$ value", justify="right")
+    if has_overrides:
+        table.add_column("OVR")
     for p in sorted(positions, key=lambda x: (-abs(x.target_weight_pct), x.card_id)):
-        table.add_row(
+        row_vals = [
             str(p.card_id),
             p.sleeve,
             p.signal_source,
             f"{p.target_weight_pct * 100:.2f}",
             f"${p.target_usd_value:,.0f}",
-        )
+        ]
+        if has_overrides:
+            row_vals.append("OVR" if p.is_override else "")
+        table.add_row(*row_vals)
     console.print(table)
     total = sum(p.target_weight_pct for p in positions)
     console.print(f"[bold]total allocated:[/bold] {total * 100:.2f}%")
@@ -909,7 +917,7 @@ def dashboard_cmd() -> None:
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[3]
-    app = repo_root / "reports" / "dashboard.py"
+    app = repo_root / "reports" / "app" / "Home.py"
     subprocess.run(["streamlit", "run", str(app)], check=False)
 
 

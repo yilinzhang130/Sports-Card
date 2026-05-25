@@ -37,7 +37,13 @@ def upgrade() -> None:
         sa.Column("computed_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
     op.create_index("ix_grading_ev_ev_per_dollar", "grading_ev", ["ev_per_dollar"])
-    op.execute("SELECT create_hypertable('grading_ev', 'as_of_date', if_not_exists => TRUE)")
+    if op.get_bind().dialect.name == "postgresql":
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            op.execute(
+                "SELECT create_hypertable('grading_ev', 'as_of_date', if_not_exists => TRUE)"
+            )
 
 
 def downgrade() -> None:

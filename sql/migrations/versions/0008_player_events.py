@@ -38,7 +38,9 @@ def upgrade() -> None:
             "event_payload",
             sa.JSON,
             nullable=False,
-            server_default=sa.text("'{}'::json"),
+            server_default=sa.text("'{}'::json")
+            if op.get_bind().dialect.name == "postgresql"
+            else sa.text("'{}'"),
         ),
         sa.Column(
             "ingested_at",
