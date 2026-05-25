@@ -514,11 +514,35 @@ def scouting_refit_mle_cmd() -> None:
         )
 
 
+@scouting.command("ingest-combine")
+@click.option(
+    "--year",
+    "years",
+    multiple=True,
+    type=int,
+    help="Draft year(s) to pull combine data for. Defaults to 2010-2024.",
+)
+def scouting_ingest_combine_cmd(years: tuple[int, ...]) -> None:
+    from sportscards.scouting.nba.ingest_combine import LiveCombineClient
+    from sportscards.scouting.nba.ingest_combine import ingest_year as ingest_combine_year
+
+    target_years = list(years) if years else list(range(2010, 2025))
+    client = LiveCombineClient()
+    for y in target_years:
+        click.echo(f"ingesting combine {y}…")
+        try:
+            ingest_combine_year(y, client=client)
+        except Exception as e:  # pragma: no cover - network failure modes
+            click.echo(f"  skipped {y}: {e}")
+    click.echo(f"done ({len(target_years)} years attempted)")
+
+
 @scouting.command("fit")
 @click.option("--start", default=2010, type=int)
 @click.option("--end", default=2024, type=int)
 def scouting_fit_cmd(start: int, end: int) -> None:
     from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_combine import load_combine_cohort
     from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
     from sportscards.scouting.nba.prism import (
         concordance,
@@ -527,12 +551,14 @@ def scouting_fit_cmd(start: int, end: int) -> None:
         train_pairwise_model,
     )
 
-    prospects, outcomes = build_unified_cohort(range(start, end + 1))
-    X, y, groups, _ = build_feature_matrix(prospects, outcomes)
+    years = range(start, end + 1)
+    prospects, outcomes = build_unified_cohort(years)
+    combine = load_combine_cohort(years)
+    X, y, groups, _ = build_feature_matrix(prospects, outcomes, combine=combine)
     model = train_pairwise_model(X, y, groups)
     save_model(model)
     c = concordance(predict_scores(model, X), y.to_numpy(), groups.to_numpy())
-    click.echo(f"trained: in-sample concordance={c:.3f}")
+    click.echo(f"trained: in-sample concordance={c:.3f}  (combine rows: {len(combine)})")
 
 
 @scouting.command("score")
@@ -540,13 +566,15 @@ def scouting_fit_cmd(start: int, end: int) -> None:
 def scouting_score_cmd(draft_year: int | None) -> None:
     from sportscards.db.session import session_scope
     from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_combine import load_combine_cohort
     from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
     from sportscards.scouting.nba.prism import load_model, predict_scores
     from sportscards.scouting.nba.score import compute_stardom_premium, persist_scores
 
     years = range(draft_year, draft_year + 1) if draft_year else range(2010, 2025)
     prospects, outcomes = build_unified_cohort(years)
-    X, _, groups, slugs = build_feature_matrix(prospects, outcomes)
+    combine = load_combine_cohort(years)
+    X, _, groups, slugs = build_feature_matrix(prospects, outcomes, combine=combine)
     model = load_model()
     scores = predict_scores(model, X)
     df = compute_stardom_premium(slugs, groups, prospects["draft_pick"], scores)
