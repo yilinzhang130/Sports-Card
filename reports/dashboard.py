@@ -63,6 +63,11 @@ def _cached_health() -> dict[str, pd.DataFrame]:
     return queries.data_health()
 
 
+@st.cache_data(ttl=300)
+def _cached_factor_panel() -> pd.DataFrame:
+    return queries.factor_panel_latest()
+
+
 def _placeholder(phase: str) -> None:
     st.info(f"Coming with {phase}.")
 
@@ -260,6 +265,20 @@ def _portfolio_tab() -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+def _factor_panel_tab() -> None:
+    st.header("Factor Panel — Momentum + Liquidity")
+    try:
+        df = _cached_factor_panel()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    if df.empty:
+        st.write("No factor_panel snapshot yet. Run `sportscards factor compute-panel`.")
+        return
+    st.caption(f"As of {df['as_of_date'].iloc[0]} — {len(df)} cards")
+    st.dataframe(df, use_container_width=True)
+
+
 def _health_tab() -> None:
     st.header("Data Health")
     try:
@@ -285,6 +304,7 @@ def render_dashboard() -> None:
             "Forward Prospects",
             "Catalysts",
             "Portfolio",
+            "Factor panel",
             "Data Health",
         ]
     )
@@ -301,6 +321,8 @@ def render_dashboard() -> None:
     with tabs[5]:
         _portfolio_tab()
     with tabs[6]:
+        _factor_panel_tab()
+    with tabs[7]:
         _health_tab()
 
 

@@ -147,6 +147,27 @@ def backtest_nav(engine: Engine | None = None) -> pd.DataFrame:
     return pd.read_sql(sql, eng)
 
 
+# --- Factor panel (momentum + liquidity) ---------------------------------------
+
+
+def factor_panel_latest(engine: Engine | None = None) -> pd.DataFrame:
+    """Latest factor_panel snapshot joined to card_master / player_master."""
+    eng = _engine(engine)
+    _require(eng, "factor_panel", "Phase 5 (factors)")
+    sql = text(
+        "SELECT f.card_id, p.name AS player, c.year, c.set AS set_name, c.parallel, "
+        "       f.as_of_date, f.r30, f.r90, f.r365, f.cs_momentum_pct, f.is_hyped, "
+        "       f.sales_count_90d, f.dollar_volume_90d, f.bid_ask_proxy, "
+        "       f.last_sale_recency_days, f.liquidity_tier "
+        "FROM factor_panel f "
+        "JOIN card_master c ON c.card_id = f.card_id "
+        "JOIN player_master p ON p.player_id = c.player_id "
+        "WHERE f.as_of_date = (SELECT MAX(as_of_date) FROM factor_panel) "
+        "ORDER BY f.cs_momentum_pct DESC NULLS LAST"
+    )
+    return pd.read_sql(sql, eng)
+
+
 # --- Catalysts (Phase 5) -------------------------------------------------------
 
 
