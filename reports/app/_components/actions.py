@@ -149,3 +149,43 @@ def scouting_score_class(
         "n_prospects": len(df),
         "n_with_mock_consensus": int(df["premium"].notna().sum()) if "premium" in df.columns else 0,
     }
+
+
+# ---------------------------------------------------------------------------
+# Ingest wrappers
+# ---------------------------------------------------------------------------
+
+
+def cardladder_import(*, path: str) -> dict[str, Any]:
+    """Mirror ``sportscards cardladder import <path>``."""
+    from sportscards.ingest.cardladder import import_sales_csv
+
+    # import_sales_csv manages its own session_scope internally
+    raw_added, clean_added = import_sales_csv(path)
+    return {"raw_added": raw_added, "clean_added": clean_added}
+
+
+def auction_import(*, path: str, house: str) -> dict[str, Any]:
+    """Mirror ``sportscards auction import <house> <path>``."""
+    from sportscards.ingest.auction_import import import_auction_csv
+
+    # import_auction_csv manages its own session_scope internally; returns int
+    added = import_auction_csv(path, house)
+    return {"raw_added": added}
+
+
+def ebay_ingest(*, keywords: str, max_pages: int) -> dict[str, Any]:
+    """Mirror ``sportscards ingest ebay``."""
+    from sportscards.ingest.ebay_browse import ingest_sold
+
+    # ingest_sold manages its own session_scope internally; returns int
+    added = ingest_sold(keywords=keywords, max_pages=max_pages)
+    return {"rows_added": added}
+
+
+def daily_psa_pop() -> dict[str, Any]:
+    """Mirror ``sportscards pop-snapshot``."""
+    from sportscards.flows.daily_psa_pop import daily_psa_pop_flow
+
+    n = daily_psa_pop_flow()
+    return {"snapshots_written": n}
