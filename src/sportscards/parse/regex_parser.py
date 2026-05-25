@@ -167,6 +167,12 @@ def parse_title(title: str) -> ParsedTitle:
         score += Decimal("0.15")
     if out.slab_grader and out.slab_grade is not None:
         score += Decimal("0.20")
+    else:
+        # Well-formed raw card — promote so router doesn't waste LLM credits,
+        # and tag method so the persistence layer treats it as raw inventory.
+        if out.year and out.manufacturer and out.set_name and out.card_number:
+            out.method = "regex_raw"
+            score = max(score, Decimal("0.85"))
     out.confidence = min(score, Decimal("1.000"))
 
     return out
