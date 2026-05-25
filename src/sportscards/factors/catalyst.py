@@ -29,34 +29,41 @@ from sportscards.db.models import PlayerEvent
 
 EVENT_WEIGHTS: dict[str, Decimal] = {
     # Awards (positive, sparse, high-impact)
-    "mvp":          Decimal("0.50"),
-    "roy":          Decimal("0.40"),
-    "dpoy":         Decimal("0.30"),
-    "all_nba_1st":  Decimal("0.30"),
-    "all_nba_2nd":  Decimal("0.20"),
-    "all_nba_3rd":  Decimal("0.15"),
-    "all_star":     Decimal("0.10"),
-    "hof":          Decimal("0.40"),
+    "mvp": Decimal("0.50"),
+    "roy": Decimal("0.40"),
+    "dpoy": Decimal("0.30"),
+    "all_nba_1st": Decimal("0.30"),
+    "all_nba_2nd": Decimal("0.20"),
+    "all_nba_3rd": Decimal("0.15"),
+    "all_star": Decimal("0.10"),
+    "hof": Decimal("0.40"),
     # Playoffs (compounds)
-    "playoff_win":          Decimal("0.01"),
-    "playoff_series_win":   Decimal("0.05"),
-    "playoff_finals_win":   Decimal("0.20"),
+    "playoff_win": Decimal("0.01"),
+    "playoff_series_win": Decimal("0.05"),
+    "playoff_finals_win": Decimal("0.20"),
     # Transactions
-    "call_up":      Decimal("0.10"),
-    "two_way":      Decimal("0.02"),
-    "traded":       Decimal("0.00"),
-    "signed":       Decimal("0.00"),
+    "call_up": Decimal("0.10"),
+    "two_way": Decimal("0.02"),
+    "traded": Decimal("0.00"),
+    "signed": Decimal("0.00"),
     # Injuries (severity-aware for injury_out — see compute_catalyst_score)
-    "injury_out":       Decimal("-0.15"),
-    "injury_dtd":       Decimal("-0.03"),
-    "injury_return":    Decimal("0.05"),
+    "injury_out": Decimal("-0.15"),
+    "injury_dtd": Decimal("-0.03"),
+    "injury_return": Decimal("0.05"),
 }
 
 DEFAULT_HALF_LIFE_DAYS: int = 30
 HALF_LIFE_OVERRIDES: dict[str, int] = {
-    "mvp": 90, "roy": 90, "dpoy": 90, "hof": 90,
-    "all_nba_1st": 90, "all_nba_2nd": 90, "all_nba_3rd": 90, "all_star": 90,
-    "playoff_finals_win": 60, "playoff_series_win": 45,
+    "mvp": 90,
+    "roy": 90,
+    "dpoy": 90,
+    "hof": 90,
+    "all_nba_1st": 90,
+    "all_nba_2nd": 90,
+    "all_nba_3rd": 90,
+    "all_star": 90,
+    "playoff_finals_win": 60,
+    "playoff_series_win": 45,
 }
 
 

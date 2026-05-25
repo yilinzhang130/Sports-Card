@@ -26,9 +26,7 @@ def session() -> Session:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     sess = Session(engine)
-    players = [
-        Player(name=f"Player {i}", br_slug=f"p{i}") for i in range(3)
-    ]
+    players = [Player(name=f"Player {i}", br_slug=f"p{i}") for i in range(3)]
     for p in players:
         sess.add(p)
     sess.flush()
@@ -80,9 +78,7 @@ def test_as_of_safety(session: Session) -> None:
     pid = _pid(session)
     _add_event(session, pid, "mvp", datetime(2024, 4, 1, tzinfo=UTC))
     session.commit()
-    score = compute_catalyst_score(
-        session, pid, datetime(2024, 3, 31, tzinfo=UTC)
-    )
+    score = compute_catalyst_score(session, pid, datetime(2024, 3, 31, tzinfo=UTC))
     assert score == Decimal("0")
 
 
@@ -92,9 +88,7 @@ def test_mvp_decay(session: Session) -> None:
     session.commit()
     s0 = compute_catalyst_score(session, pid, DAY0)
     s90 = compute_catalyst_score(session, pid, DAY0 + timedelta(days=90))
-    s180 = compute_catalyst_score(
-        session, pid, DAY0 + timedelta(days=180), lookback_days=200
-    )
+    s180 = compute_catalyst_score(session, pid, DAY0 + timedelta(days=180), lookback_days=200)
     assert _approx(s0, 0.50)
     assert _approx(s90, 0.25)
     assert _approx(s180, 0.125)
@@ -115,12 +109,8 @@ def test_injury_negative_decay(session: Session) -> None:
 def test_severity_bumps(session: Session) -> None:
     pid_se = _pid(session, 0)
     pid_short = _pid(session, 1)
-    _add_event(
-        session, pid_se, "injury_out", DAY0, payload={"season_ending": True}
-    )
-    _add_event(
-        session, pid_short, "injury_out", DAY0, payload={"expected_weeks_out": 2}
-    )
+    _add_event(session, pid_se, "injury_out", DAY0, payload={"season_ending": True})
+    _add_event(session, pid_short, "injury_out", DAY0, payload={"expected_weeks_out": 2})
     session.commit()
     assert _approx(compute_catalyst_score(session, pid_se, DAY0), -0.30)
     assert _approx(compute_catalyst_score(session, pid_short, DAY0), -0.05)

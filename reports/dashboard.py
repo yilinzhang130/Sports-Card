@@ -206,9 +206,7 @@ def _catalysts_tab() -> None:
     if top.empty:
         st.write("No catalyst-scored players in the window.")
         return
-    chosen = st.selectbox(
-        "Player", options=top["player_name"].tolist(), key="catalyst_player"
-    )
+    chosen = st.selectbox("Player", options=top["player_name"].tolist(), key="catalyst_player")
     if chosen:
         pid = int(top.loc[top["player_name"] == chosen, "player_id"].iloc[0])
         try:

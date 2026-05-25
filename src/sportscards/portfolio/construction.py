@@ -183,9 +183,7 @@ def _apply_tactical_tilt(
         sign = -1.0 if sleeve == "factor_short" else 1.0
 
         # Rank by score; missing → 0.0
-        scored = [
-            (p, catalyst_scores.get(p.card_id, 0.0)) for p in sleeve_positions
-        ]
+        scored = [(p, catalyst_scores.get(p.card_id, 0.0)) for p in sleeve_positions]
         scored.sort(key=lambda x: x[1], reverse=True)
 
         k = max(0, n // quintile)

@@ -180,15 +180,11 @@ def test_tactical_tilt_without_scores_warns_and_falls_back() -> None:
 def test_tactical_tilt_top_score_gets_boost_bottom_gets_cut() -> None:
     # 5 anchors → top quintile = 1 name, bottom quintile = 1 name
     universe = UniverseSnapshot(
-        anchors_df=pd.DataFrame(
-            {"card_id": [10, 11, 12, 13, 14], "last_price": 500.0}
-        ),
+        anchors_df=pd.DataFrame({"card_id": [10, 11, 12, 13, 14], "last_price": 500.0}),
         factor_df=None,
         prospect_df=None,
     )
-    cfg = AllocationConfig(
-        anchor_position_cap_pct=0.50, tactical_tilt=True
-    )
+    cfg = AllocationConfig(anchor_position_cap_pct=0.50, tactical_tilt=True)
     scores = {10: 5.0, 11: 1.0, 12: 0.0, 13: -1.0, 14: -5.0}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -208,11 +204,14 @@ def test_tactical_tilt_preserves_sleeve_total_weight() -> None:
         prospect_per_name_cap_pct=0.50,
         tactical_tilt=True,
     )
-    baseline = build_portfolio(universe, AllocationConfig(
-        anchor_position_cap_pct=0.50,
-        other_position_cap_pct=0.50,
-        prospect_per_name_cap_pct=0.50,
-    ))
+    baseline = build_portfolio(
+        universe,
+        AllocationConfig(
+            anchor_position_cap_pct=0.50,
+            other_position_cap_pct=0.50,
+            prospect_per_name_cap_pct=0.50,
+        ),
+    )
     scores = {p.card_id: float(p.card_id % 7) for p in baseline}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -222,17 +221,13 @@ def test_tactical_tilt_preserves_sleeve_total_weight() -> None:
         return sum(p.target_weight_pct for p in positions if p.sleeve == sleeve)
 
     for sleeve in ("anchor", "prospect"):
-        assert sleeve_total(out, sleeve) == pytest.approx(
-            sleeve_total(baseline, sleeve), abs=1e-9
-        )
+        assert sleeve_total(out, sleeve) == pytest.approx(sleeve_total(baseline, sleeve), abs=1e-9)
 
 
 def test_tactical_tilt_respects_anchor_position_cap() -> None:
     # Tight cap forces the boost to clip
     universe = UniverseSnapshot(
-        anchors_df=pd.DataFrame(
-            {"card_id": list(range(20, 30)), "last_price": 500.0}
-        ),
+        anchors_df=pd.DataFrame({"card_id": list(range(20, 30)), "last_price": 500.0}),
         factor_df=None,
         prospect_df=None,
     )
@@ -240,9 +235,7 @@ def test_tactical_tilt_respects_anchor_position_cap() -> None:
     cfg = AllocationConfig(anchor_position_cap_pct=cap, tactical_tilt=True)
     # equal weight → 0.07 each; top boosted to 0.084 (still under cap)
     # so use a giant tilt to force the cap to bind
-    cfg = AllocationConfig(
-        anchor_position_cap_pct=cap, tactical_tilt=True, tactical_tilt_pct=2.0
-    )
+    cfg = AllocationConfig(anchor_position_cap_pct=cap, tactical_tilt=True, tactical_tilt_pct=2.0)
     scores = {cid: float(cid) for cid in range(20, 30)}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

@@ -141,9 +141,7 @@ def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
     ]
 
 
-def load_catalyst_scores(
-    session: Any, card_ids: list[int], as_of: datetime
-) -> dict[int, float]:
+def load_catalyst_scores(session: Any, card_ids: list[int], as_of: datetime) -> dict[int, float]:
     """Map ``card_id → catalyst_score`` for the card's player as of date.
 
     Joins ``card_master → player_master → catalyst.compute_catalyst_scores_bulk``.

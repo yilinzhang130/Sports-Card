@@ -70,9 +70,7 @@ def test_injuries_writes_events(session: Session, tmp_path: Path) -> None:
 
 def test_injuries_idempotent(session: Session, tmp_path: Path) -> None:
     day = date(2026, 1, 5)
-    client = FakeInjuryClient(
-        {day: [injuries.InjuryRow(2544, "LeBron James", "out", day, None)]}
-    )
+    client = FakeInjuryClient({day: [injuries.InjuryRow(2544, "LeBron James", "out", day, None)]})
     injuries.ingest_injuries(session, client=client, as_of=day, cache_dir=tmp_path)
     before = _event_count(session)
     injuries.ingest_injuries(session, client=client, as_of=day, cache_dir=tmp_path)
@@ -103,9 +101,7 @@ def test_injuries_status_change_flow(session: Session, tmp_path: Path) -> None:
 
 def test_injuries_writes_cache_file(session: Session, tmp_path: Path) -> None:
     day = date(2026, 1, 5)
-    client = FakeInjuryClient(
-        {day: [injuries.InjuryRow(2544, "LeBron James", "out", day, None)]}
-    )
+    client = FakeInjuryClient({day: [injuries.InjuryRow(2544, "LeBron James", "out", day, None)]})
     injuries.ingest_injuries(session, client=client, as_of=day, cache_dir=tmp_path)
     assert (tmp_path / f"{day.isoformat()}.json").exists()
 
@@ -222,9 +218,7 @@ def test_awards_writes_events(session: Session, tmp_path: Path) -> None:
         session, client=FakeAwardsClient(rows), season="2024-25", cache_dir=tmp_path
     )
     assert n == 2
-    events = session.execute(
-        select(PlayerEvent).order_by(PlayerEvent.event_type)
-    ).scalars().all()
+    events = session.execute(select(PlayerEvent).order_by(PlayerEvent.event_type)).scalars().all()
     assert events[0].event_date == datetime(2025, 6, 30)
 
 

@@ -39,8 +39,7 @@ class AwardRow:
 
 
 class AwardsClient(Protocol):
-    def get_awards(self, season: str) -> list[AwardRow]:
-        ...
+    def get_awards(self, season: str) -> list[AwardRow]: ...
 
 
 class LiveAwardsClient:

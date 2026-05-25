@@ -50,8 +50,7 @@ class InjuryRow:
 class InjuryClient(Protocol):
     """Narrow protocol for the upstream injury feed."""
 
-    def get_injury_report(self, as_of: date) -> list[InjuryRow]:
-        ...
+    def get_injury_report(self, as_of: date) -> list[InjuryRow]: ...
 
 
 class LiveInjuryClient:

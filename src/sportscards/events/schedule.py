@@ -36,8 +36,7 @@ class GameRow:
 
 
 class ScheduleClient(Protocol):
-    def get_schedule(self, season: str) -> list[GameRow]:
-        ...
+    def get_schedule(self, season: str) -> list[GameRow]: ...
 
 
 class LiveScheduleClient:
@@ -99,9 +98,9 @@ def ingest_schedule(
         else:
             event_type = PlayerEventType.PLAYOFF_WIN.value
 
-        roster = session.execute(
-            select(Player).where(Player.team == game.winner_team)
-        ).scalars().all()
+        roster = (
+            session.execute(select(Player).where(Player.team == game.winner_team)).scalars().all()
+        )
         if not roster:
             logger.warning(
                 "no players found for winner team %s on %s", game.winner_team, game.game_date

@@ -150,9 +150,7 @@ def backtest_nav(engine: Engine | None = None) -> pd.DataFrame:
 # --- Catalysts (Phase 5) -------------------------------------------------------
 
 
-def recent_events(
-    engine: Engine | None = None, days: int = 30, limit: int = 100
-) -> pd.DataFrame:
+def recent_events(engine: Engine | None = None, days: int = 30, limit: int = 100) -> pd.DataFrame:
     """Latest events in the past `days`.
 
     Columns: event_date, player_name, event_type, event_payload.
@@ -171,9 +169,7 @@ def recent_events(
     return pd.read_sql(sql, eng, params={"cutoff": cutoff, "lim": limit})
 
 
-def top_catalysts(
-    engine: Engine | None = None, days: int = 30, limit: int = 10
-) -> pd.DataFrame:
+def top_catalysts(engine: Engine | None = None, days: int = 30, limit: int = 10) -> pd.DataFrame:
     """Top N players by absolute catalyst score over the past `days`.
 
     Columns: player_id, player_name, catalyst_score.
@@ -187,23 +183,17 @@ def top_catalysts(
 
     with Session(eng) as session:
         pid_rows = session.execute(
-            text(
-                "SELECT DISTINCT player_id FROM player_events "
-                "WHERE event_date >= :cutoff"
-            ),
+            text("SELECT DISTINCT player_id FROM player_events WHERE event_date >= :cutoff"),
             {"cutoff": cutoff},
         ).all()
         player_ids = [int(r[0]) for r in pid_rows]
         if not player_ids:
-            return pd.DataFrame(
-                columns=["player_id", "player_name", "catalyst_score"]
-            )
+            return pd.DataFrame(columns=["player_id", "player_name", "catalyst_score"])
         scores = compute_catalyst_scores_bulk(session, player_ids, as_of)
         name_rows = session.execute(
-            text(
-                "SELECT player_id, name FROM player_master "
-                "WHERE player_id IN :pids"
-            ).bindparams(bindparam("pids", expanding=True)),
+            text("SELECT player_id, name FROM player_master WHERE player_id IN :pids").bindparams(
+                bindparam("pids", expanding=True)
+            ),
             {"pids": player_ids},
         ).all()
         names = {int(pid): name for pid, name in name_rows}

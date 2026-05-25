@@ -246,9 +246,7 @@ class PlayerEvent(Base):
     __tablename__ = "player_events"
 
     event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    player_id: Mapped[int] = mapped_column(
-        ForeignKey("player_master.player_id"), nullable=False
-    )
+    player_id: Mapped[int] = mapped_column(ForeignKey("player_master.player_id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(32), nullable=False)
     event_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     event_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)

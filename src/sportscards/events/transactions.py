@@ -35,8 +35,7 @@ class TxnRow:
 
 
 class TransactionsClient(Protocol):
-    def get_transactions(self, since: date) -> list[TxnRow]:
-        ...
+    def get_transactions(self, since: date) -> list[TxnRow]: ...
 
 
 class LiveTransactionsClient:

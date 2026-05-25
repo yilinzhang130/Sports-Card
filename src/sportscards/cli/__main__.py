@@ -225,9 +225,7 @@ def portfolio_plan_cmd(aum: float, tactical: bool) -> None:
                     ids.update(int(x) for x in mispricing["card_id"].tolist())
                 if stardom is not None and not stardom.empty:
                     ids.update(int(x) for x in stardom["card_id"].tolist())
-                catalyst_scores = load_catalyst_scores(
-                    s, sorted(ids), now.to_pydatetime()
-                )
+                catalyst_scores = load_catalyst_scores(s, sorted(ids), now.to_pydatetime())
         positions = build_portfolio(
             UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
             AllocationConfig(total_aum_usd=aum, tactical_tilt=tactical),
