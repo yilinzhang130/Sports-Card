@@ -123,3 +123,6 @@ ignore_errors = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
+
+[tool.vercel]
+entrypoint = "api.ebay-webhook:handler"
