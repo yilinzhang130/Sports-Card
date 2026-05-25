@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Protocol
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Player, PlayerEvent, PlayerEventType
+from sportscards.db.models import PlayerEvent, PlayerEventType
+from sportscards.events._common import (
+    existing_event_keys,
+    resolve_player_by_name,
+    write_json_cache,
+)
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_CACHE_DIR = Path("data/events_cache/transactions")
 
 _VALID_TXN = {
     PlayerEventType.CALL_UP.value,
@@ -44,22 +45,6 @@ class LiveTransactionsClient:
         raise NotImplementedError("LiveTransactionsClient not implemented")
 
 
-def _write_cache(rows: list[TxnRow], since: date, cache_dir: Path) -> Path:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    out_path = cache_dir / f"since-{since.isoformat()}.json"
-    payload = [
-        {"txn_type": r.txn_type, "txn_date": r.txn_date.isoformat(), "player_name": r.player_name}
-        for r in rows
-    ]
-    out_path.write_text(json.dumps(payload, indent=2))
-    return out_path
-
-
-def _resolve_player(session: Session, name: str) -> Player | None:
-    stmt = select(Player).where(func.lower(Player.name) == name.strip().lower())
-    return session.execute(stmt).scalars().first()
-
-
 def ingest_transactions(
     session: Session,
     *,
@@ -68,39 +53,59 @@ def ingest_transactions(
     cache_dir: Path | None = None,
 ) -> int:
     rows = client.get_transactions(since)
-    _write_cache(rows, since, cache_dir or DEFAULT_CACHE_DIR)
+    write_json_cache(
+        [
+            {
+                "txn_type": r.txn_type,
+                "txn_date": r.txn_date.isoformat(),
+                "player_name": r.player_name,
+            }
+            for r in rows
+        ],
+        source="transactions",
+        as_of=f"since-{since.isoformat()}",
+        cache_dir=cache_dir,
+    )
 
-    written = 0
+    candidates: list[tuple[int, str, datetime]] = []
     for row in rows:
         if row.txn_type not in _VALID_TXN:
             logger.warning("unknown txn_type %r — skipping", row.txn_type)
             continue
-
-        player = _resolve_player(session, row.player_name)
-        if player is None:
-            logger.warning("could not resolve transaction player by name: %s", row.player_name)
+        pid = resolve_player_by_name(session, row.player_name)
+        if pid is None:
             continue
-
         event_dt = datetime.combine(row.txn_date, datetime.min.time())
-        exists = session.execute(
-            select(PlayerEvent.event_id).where(
-                PlayerEvent.player_id == player.player_id,
-                PlayerEvent.event_type == row.txn_type,
-                PlayerEvent.event_date == event_dt,
-            )
-        ).first()
-        if exists:
-            continue
+        candidates.append((pid, row.txn_type, event_dt))
 
+    if not candidates:
+        session.commit()
+        return 0
+
+    player_ids = {c[0] for c in candidates}
+    types = {c[1] for c in candidates}
+    dates = [c[2] for c in candidates]
+    existing = existing_event_keys(
+        session,
+        player_ids=list(player_ids),
+        event_types=list(types),
+        date_range=(min(dates), max(dates)),
+    )
+
+    written = 0
+    for pid, etype, event_dt in candidates:
+        key = (pid, etype, event_dt)
+        if key in existing:
+            continue
         session.add(
             PlayerEvent(
-                player_id=player.player_id,
-                event_type=row.txn_type,
+                player_id=pid,
+                event_type=etype,
                 event_date=event_dt,
                 event_payload={},
             )
         )
-        session.flush()
+        existing.add(key)
         written += 1
 
     session.commit()

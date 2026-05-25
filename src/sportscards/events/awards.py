@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Player, PlayerEvent, PlayerEventType
+from sportscards.db.models import PlayerEvent, PlayerEventType
+from sportscards.events._common import (
+    existing_event_keys,
+    resolve_player_by_name,
+    write_json_cache,
+)
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_CACHE_DIR = Path("data/events_cache/awards")
 
 _VALID_AWARDS = {
     PlayerEventType.MVP.value,
@@ -58,22 +59,6 @@ def _season_end_date(season: str) -> datetime:
     return datetime(end_year, 6, 30)
 
 
-def _write_cache(rows: list[AwardRow], season: str, cache_dir: Path) -> Path:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    out_path = cache_dir / f"{season}.json"
-    payload = [
-        {"award_type": r.award_type, "season": r.season, "player_name": r.player_name}
-        for r in rows
-    ]
-    out_path.write_text(json.dumps(payload, indent=2))
-    return out_path
-
-
-def _resolve_player(session: Session, name: str) -> Player | None:
-    stmt = select(Player).where(func.lower(Player.name) == name.strip().lower())
-    return session.execute(stmt).scalars().first()
-
-
 def ingest_awards(
     session: Session,
     *,
@@ -82,39 +67,56 @@ def ingest_awards(
     cache_dir: Path | None = None,
 ) -> int:
     rows = client.get_awards(season)
-    _write_cache(rows, season, cache_dir or DEFAULT_CACHE_DIR)
+    write_json_cache(
+        [
+            {"award_type": r.award_type, "season": r.season, "player_name": r.player_name}
+            for r in rows
+        ],
+        source="awards",
+        as_of=season,
+        cache_dir=cache_dir,
+    )
 
-    written = 0
+    # Resolve + classify once, then dedupe with a single SELECT.
+    candidates: list[tuple[int, str, datetime, AwardRow]] = []
     for row in rows:
         if row.award_type not in _VALID_AWARDS:
             logger.warning("unknown award_type %r — skipping", row.award_type)
             continue
-
-        player = _resolve_player(session, row.player_name)
-        if player is None:
-            logger.warning("could not resolve award player by name: %s", row.player_name)
+        pid = resolve_player_by_name(session, row.player_name)
+        if pid is None:
             continue
-
         event_dt = _season_end_date(row.season)
-        exists = session.execute(
-            select(PlayerEvent.event_id).where(
-                PlayerEvent.player_id == player.player_id,
-                PlayerEvent.event_type == row.award_type,
-                PlayerEvent.event_date == event_dt,
-            )
-        ).first()
-        if exists:
-            continue
+        candidates.append((pid, row.award_type, event_dt, row))
 
+    if not candidates:
+        session.commit()
+        return 0
+
+    player_ids = {c[0] for c in candidates}
+    types = {c[1] for c in candidates}
+    dates = [c[2] for c in candidates]
+    existing = existing_event_keys(
+        session,
+        player_ids=list(player_ids),
+        event_types=list(types),
+        date_range=(min(dates), max(dates)),
+    )
+
+    written = 0
+    for pid, etype, event_dt, row in candidates:
+        key = (pid, etype, event_dt)
+        if key in existing:
+            continue
         session.add(
             PlayerEvent(
-                player_id=player.player_id,
-                event_type=row.award_type,
+                player_id=pid,
+                event_type=etype,
                 event_date=event_dt,
                 event_payload={"season": row.season},
             )
         )
-        session.flush()
+        existing.add(key)
         written += 1
 
     session.commit()

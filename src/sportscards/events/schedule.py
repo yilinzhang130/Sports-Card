@@ -7,7 +7,6 @@ types when the client supplies them.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -18,10 +17,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import Player, PlayerEvent, PlayerEventType
+from sportscards.events._common import existing_event_keys, write_json_cache
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_CACHE_DIR = Path("data/events_cache/schedule")
 
 
 @dataclass(frozen=True)
@@ -48,25 +46,11 @@ class LiveScheduleClient:
         raise NotImplementedError("LiveScheduleClient not implemented; add nba_api dep first")
 
 
-def _write_cache(rows: list[GameRow], season: str, cache_dir: Path) -> Path:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    out_path = cache_dir / f"{season}.json"
-    payload = [
-        {
-            "game_id": r.game_id,
-            "game_date": r.game_date.isoformat(),
-            "home_team": r.home_team,
-            "away_team": r.away_team,
-            "is_playoff": r.is_playoff,
-            "is_finals": r.is_finals,
-            "is_all_star": r.is_all_star,
-            "winner_team": r.winner_team,
-            "is_series_clincher": r.is_series_clincher,
-        }
-        for r in rows
-    ]
-    out_path.write_text(json.dumps(payload, indent=2))
-    return out_path
+_PLAYOFF_TYPES = [
+    PlayerEventType.PLAYOFF_WIN.value,
+    PlayerEventType.PLAYOFF_SERIES_WIN.value,
+    PlayerEventType.PLAYOFF_FINALS_WIN.value,
+]
 
 
 def ingest_schedule(
@@ -78,14 +62,36 @@ def ingest_schedule(
 ) -> int:
     """Emit playoff/finals win events. Returns count written."""
     rows = client.get_schedule(season)
-    _write_cache(rows, season, cache_dir or DEFAULT_CACHE_DIR)
+    write_json_cache(
+        [
+            {
+                "game_id": r.game_id,
+                "game_date": r.game_date.isoformat(),
+                "home_team": r.home_team,
+                "away_team": r.away_team,
+                "is_playoff": r.is_playoff,
+                "is_finals": r.is_finals,
+                "is_all_star": r.is_all_star,
+                "winner_team": r.winner_team,
+                "is_series_clincher": r.is_series_clincher,
+            }
+            for r in rows
+        ],
+        source="schedule",
+        as_of=season,
+        cache_dir=cache_dir,
+    )
 
-    written = 0
+    # First pass: gather playoff games + their rosters, collect candidate
+    # event keys so we can dedupe in a single batched SELECT.
+    plans: list[tuple[GameRow, str, datetime, list[Player]]] = []
+    all_player_ids: set[int] = set()
+    all_dates: list[datetime] = []
+
     for game in rows:
         if not game.is_playoff or not game.winner_team:
             continue
 
-        # Highest-priority event type wins (finals > series > regular playoff).
         if game.is_finals and game.is_series_clincher:
             event_type = PlayerEventType.PLAYOFF_FINALS_WIN.value
         elif game.is_series_clincher:
@@ -97,19 +103,32 @@ def ingest_schedule(
             select(Player).where(Player.team == game.winner_team)
         ).scalars().all()
         if not roster:
-            logger.warning("no players found for winner team %s on %s", game.winner_team, game.game_date)
+            logger.warning(
+                "no players found for winner team %s on %s", game.winner_team, game.game_date
+            )
             continue
 
         event_dt = datetime.combine(game.game_date, datetime.min.time())
+        plans.append((game, event_type, event_dt, list(roster)))
+        all_player_ids.update(p.player_id for p in roster)
+        all_dates.append(event_dt)
+
+    if not plans:
+        session.commit()
+        return 0
+
+    existing = existing_event_keys(
+        session,
+        player_ids=list(all_player_ids),
+        event_types=_PLAYOFF_TYPES,
+        date_range=(min(all_dates), max(all_dates)),
+    )
+
+    written = 0
+    for game, event_type, event_dt, roster in plans:
         for player in roster:
-            exists = session.execute(
-                select(PlayerEvent.event_id).where(
-                    PlayerEvent.player_id == player.player_id,
-                    PlayerEvent.event_type == event_type,
-                    PlayerEvent.event_date == event_dt,
-                )
-            ).first()
-            if exists:
+            key = (player.player_id, event_type, event_dt)
+            if key in existing:
                 continue
             session.add(
                 PlayerEvent(
@@ -124,7 +143,7 @@ def ingest_schedule(
                     },
                 )
             )
-            session.flush()
+            existing.add(key)
             written += 1
 
     session.commit()

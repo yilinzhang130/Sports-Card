@@ -8,26 +8,34 @@ prior event. The actual upstream feed (nba_api) is wrapped behind
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Protocol
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Player, PlayerEvent, PlayerEventType
+from sportscards.db.models import PlayerEvent, PlayerEventType
+from sportscards.events._common import (
+    existing_event_keys,
+    resolve_player_by_name,
+    write_json_cache,
+)
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_CACHE_DIR = Path("data/events_cache/injuries")
 
 # Map raw upstream status -> our internal event_type.
 _OUT_STATUSES = {"out", "season_ending", "season-ending"}
 _DTD_STATUSES = {"day_to_day", "day-to-day", "questionable", "probable", "doubtful"}
 _RETURN_STATUSES = {"available", "active", "healthy"}
+
+_INJURY_TYPES = [
+    PlayerEventType.INJURY_OUT.value,
+    PlayerEventType.INJURY_DTD.value,
+    PlayerEventType.INJURY_RETURN.value,
+]
 
 
 @dataclass(frozen=True)
@@ -70,41 +78,14 @@ def _classify(status: str) -> str | None:
 
 
 def _latest_event(session: Session, player_id: int) -> PlayerEvent | None:
-    injury_types = [
-        PlayerEventType.INJURY_OUT.value,
-        PlayerEventType.INJURY_DTD.value,
-        PlayerEventType.INJURY_RETURN.value,
-    ]
     stmt = (
         select(PlayerEvent)
         .where(PlayerEvent.player_id == player_id)
-        .where(PlayerEvent.event_type.in_(injury_types))
+        .where(PlayerEvent.event_type.in_(_INJURY_TYPES))
         .order_by(PlayerEvent.event_date.desc())
         .limit(1)
     )
     return session.execute(stmt).scalar_one_or_none()
-
-
-def _resolve_player(session: Session, name: str) -> Player | None:
-    stmt = select(Player).where(func.lower(Player.name) == name.strip().lower())
-    return session.execute(stmt).scalars().first()
-
-
-def _write_cache(rows: list[InjuryRow], as_of: date, cache_dir: Path) -> Path:
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    out_path = cache_dir / f"{as_of.isoformat()}.json"
-    payload = [
-        {
-            "nba_player_id": r.nba_player_id,
-            "name": r.name,
-            "status": r.status,
-            "status_date": r.status_date.isoformat(),
-            "note": r.note,
-        }
-        for r in rows
-    ]
-    out_path.write_text(json.dumps(payload, indent=2))
-    return out_path
 
 
 def ingest_injuries(
@@ -116,42 +97,73 @@ def ingest_injuries(
 ) -> int:
     """Pull injury report for ``as_of`` and emit change-events. Returns count written."""
     rows = client.get_injury_report(as_of)
-    _write_cache(rows, as_of, cache_dir or DEFAULT_CACHE_DIR)
+    write_json_cache(
+        [
+            {
+                "nba_player_id": r.nba_player_id,
+                "name": r.name,
+                "status": r.status,
+                "status_date": r.status_date.isoformat(),
+                "note": r.note,
+            }
+            for r in rows
+        ],
+        source="injuries",
+        as_of=as_of,
+        cache_dir=cache_dir,
+    )
 
-    written = 0
+    # Pre-resolve all candidate (player_id, type, dt) keys so we can dedupe
+    # against the unique constraint without a per-row SELECT.
+    candidates: list[tuple[int, str, datetime, InjuryRow]] = []
     for row in rows:
         new_type = _classify(row.status)
         if new_type is None:
             logger.warning("unknown injury status %r for %s", row.status, row.name)
             continue
-
-        player = _resolve_player(session, row.name)
-        if player is None:
-            logger.warning("could not resolve injury player by name: %s", row.name)
+        pid = resolve_player_by_name(session, row.name)
+        if pid is None:
             continue
-
-        prior = _latest_event(session, player.player_id)
-        # Skip an initial "return" when there's no prior injury context.
-        if prior is None and new_type == PlayerEventType.INJURY_RETURN.value:
-            continue
-        if prior is not None and prior.event_type == new_type:
-            continue
-
         event_dt = datetime.combine(row.status_date, datetime.min.time())
-        # Defensive dedupe vs unique constraint on (player_id, event_type, event_date).
-        exists = session.execute(
-            select(PlayerEvent.event_id).where(
-                PlayerEvent.player_id == player.player_id,
-                PlayerEvent.event_type == new_type,
-                PlayerEvent.event_date == event_dt,
-            )
-        ).first()
-        if exists:
+        candidates.append((pid, new_type, event_dt, row))
+
+    if not candidates:
+        session.commit()
+        return 0
+
+    player_ids = {c[0] for c in candidates}
+    dates = [c[2] for c in candidates]
+    existing = existing_event_keys(
+        session,
+        player_ids=list(player_ids),
+        event_types=_INJURY_TYPES,
+        date_range=(min(dates), max(dates)),
+    )
+
+    # Track in-batch additions so multiple rows for the same player in a
+    # single call still see the "prior" type without needing a flush.
+    latest_in_batch: dict[int, tuple[str, datetime]] = {}
+
+    written = 0
+    for pid, new_type, event_dt, row in candidates:
+        in_batch = latest_in_batch.get(pid)
+        if in_batch is not None:
+            prior_type: str | None = in_batch[0]
+        else:
+            prior = _latest_event(session, pid)
+            prior_type = prior.event_type if prior is not None else None
+
+        # Skip an initial "return" when there's no prior injury context.
+        if prior_type is None and new_type == PlayerEventType.INJURY_RETURN.value:
+            continue
+        if prior_type is not None and prior_type == new_type:
+            continue
+        if (pid, new_type, event_dt) in existing:
             continue
 
         session.add(
             PlayerEvent(
-                player_id=player.player_id,
+                player_id=pid,
                 event_type=new_type,
                 event_date=event_dt,
                 event_payload={
@@ -161,7 +173,8 @@ def ingest_injuries(
                 },
             )
         )
-        session.flush()
+        existing.add((pid, new_type, event_dt))
+        latest_in_batch[pid] = (new_type, event_dt)
         written += 1
 
     session.commit()
