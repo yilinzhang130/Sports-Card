@@ -15,6 +15,22 @@ POSITIONS = ["PG", "SG", "SF", "PF", "C"]
 POSITION_ALIASES: dict[str, str] = {"G": "SG", "F": "SF"}
 UNDRAFTED_SENTINEL = 61.0  # one past the last NBA pick — bust prior
 
+# Categorical values that ``prospect_origin`` can take. New rows from
+# G-League / Euro ingestors get one of these tags; rows from the legacy
+# NCAA-only cohort default to NCAA. Stored as one-hot columns so CatBoost
+# treats them identically to position one-hots.
+ORIGIN_CATEGORIES = [
+    "NCAA",
+    "GLEAGUE",
+    "EUROLEAGUE",
+    "LIGA_ACB",
+    "LNB",
+    "LBA",
+    "NBL",
+    "OTHER_INTL",
+]
+DEFAULT_ORIGIN = "NCAA"
+
 NUMERIC_FEATURES = [
     "trb_pct",
     "ast_pct",
@@ -30,6 +46,9 @@ NUMERIC_FEATURES = [
     "mock_rank",
     "wingspan_in",
     "max_vert_in",
+    "years_in_prior_league",
+    "prior_league_mle_score",
+    "prior_league_strength_rank",
 ]
 
 
@@ -64,6 +83,18 @@ def build_feature_matrix(
     merged["log_draft_pick"] = np.log1p(merged["draft_pick"])
     merged["mock_rank"] = merged["draft_pick"]
 
+    # Backward-compat defaults for columns added by the unified cohort
+    # builder. Old NCAA-only parquets won't have these — treat such rows as
+    # NCAA prospects observed for one season with MLE = 1.0 (no scaling).
+    if "prior_league_mle_score" not in merged.columns:
+        merged["prior_league_mle_score"] = 1.0
+    if "prior_league_strength_rank" not in merged.columns:
+        merged["prior_league_strength_rank"] = 3
+    if "years_in_prior_league" not in merged.columns:
+        merged["years_in_prior_league"] = 1
+    if "prospect_origin" not in merged.columns:
+        merged["prospect_origin"] = DEFAULT_ORIGIN
+
     for col in NUMERIC_FEATURES:
         if col in {"draft_pick", "log_draft_pick", "mock_rank"}:
             continue  # already imputed above; do not re-overwrite
@@ -76,7 +107,17 @@ def build_feature_matrix(
     for p in POSITIONS:
         merged[f"pos_{p}"] = (pos == p).astype(int)
 
-    feature_cols = NUMERIC_FEATURES + [f"pos_{p}" for p in POSITIONS]
+    origin = (
+        merged["prospect_origin"].fillna(DEFAULT_ORIGIN).astype(str).str.upper()
+    )
+    for o in ORIGIN_CATEGORIES:
+        merged[f"origin_{o}"] = (origin == o).astype(int)
+
+    feature_cols = (
+        NUMERIC_FEATURES
+        + [f"pos_{p}" for p in POSITIONS]
+        + [f"origin_{o}" for o in ORIGIN_CATEGORIES]
+    )
     X = merged[feature_cols].astype(float)
     y = build_target(merged)
     return X, y, merged["draft_year"].astype(int), merged["br_slug"]

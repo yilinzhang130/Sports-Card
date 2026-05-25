@@ -1,0 +1,14 @@
+# Major League Equivalency multipliers — scale prior-league per-40 stats to
+# NCAA-equivalent so the pairwise model can compare prospects across pipelines.
+# Seeded from desk research; first-order correction only.
+# TODO refit from data once 5+ draft classes with both college + euro samples
+# are observed (use `sportscards scouting refit-mle`).
+leagues:
+  NCAA:       {mle: 1.00, strength_rank: 3}
+  GLEAGUE:    {mle: 1.05, strength_rank: 4}
+  EUROLEAGUE: {mle: 1.15, strength_rank: 5}
+  LIGA_ACB:   {mle: 1.08, strength_rank: 4}
+  LNB:        {mle: 0.95, strength_rank: 3}
+  LBA:        {mle: 1.00, strength_rank: 3}
+  NBL:        {mle: 0.92, strength_rank: 3}
+  OTHER_INTL: {mle: 0.85, strength_rank: 2}

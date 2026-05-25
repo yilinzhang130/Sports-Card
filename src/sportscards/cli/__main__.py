@@ -431,12 +431,91 @@ def scouting_ingest_nba_cmd(years: tuple[int, ...]) -> None:
     click.echo(f"done ({len(target_years)} years)")
 
 
+@scouting.command("ingest-gleague")
+@click.option(
+    "--season",
+    "seasons",
+    multiple=True,
+    type=str,
+    help="G-League season(s) in 'YYYY-YY' form. Defaults to 2017-18 .. 2024-25.",
+)
+def scouting_ingest_gleague_cmd(seasons: tuple[str, ...]) -> None:
+    from sportscards.scouting.nba.ingest_gleague import LiveGLeagueClient, ingest_season
+
+    target = list(seasons) if seasons else [
+        f"{y}-{str(y + 1)[-2:]}" for y in range(2017, 2025)
+    ]
+    client = LiveGLeagueClient()
+    for s in target:
+        click.echo(f"ingesting G-League {s}…")
+        ingest_season(s, client=client)
+    click.echo(f"done ({len(target)} seasons)")
+
+
+@scouting.command("ingest-euro")
+@click.option(
+    "--league",
+    "leagues",
+    multiple=True,
+    type=click.Choice(["euroleague", "eurocup", "acb", "lnb", "lba", "nbl"]),
+    help="European league(s) to pull. Defaults to all six.",
+)
+@click.option(
+    "--season",
+    "seasons",
+    multiple=True,
+    type=str,
+    help="Season(s) in 'YYYY-YY' form. Defaults to 2017-18 .. 2024-25.",
+)
+def scouting_ingest_euro_cmd(leagues: tuple[str, ...], seasons: tuple[str, ...]) -> None:
+    from sportscards.scouting.nba.ingest_euro import (
+        LEAGUE_IDS,
+        LiveEuroClient,
+        ingest_league_season,
+    )
+
+    target_leagues = list(leagues) if leagues else list(LEAGUE_IDS.keys())
+    target_seasons = list(seasons) if seasons else [
+        f"{y}-{str(y + 1)[-2:]}" for y in range(2017, 2025)
+    ]
+    client = LiveEuroClient()
+    for lg in target_leagues:
+        for s in target_seasons:
+            click.echo(f"ingesting {lg} {s}…")
+            ingest_league_season(lg, s, client=client)
+    click.echo(f"done ({len(target_leagues)}x{len(target_seasons)} pulls)")
+
+
+@scouting.command("refit-mle")
+def scouting_refit_mle_cmd() -> None:
+    """Refit Major League Equivalency multipliers from observed draft classes.
+
+    TODO refit from data once 5+ draft classes with both college + euro
+    samples are observed. Currently a stub that reports the cohort and warns
+    if there isn't enough data — the seeded YAML continues to ship.
+    """
+    from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
+
+    prospects, _ = build_unified_cohort(range(2010, 2025))
+    by_origin = prospects.groupby("prospect_origin").size()
+    classes_per_origin = prospects.groupby("prospect_origin")["draft_year"].nunique()
+    click.echo("observed cohort:")
+    for origin, n in by_origin.items():
+        k = int(classes_per_origin.get(origin, 0))
+        click.echo(f"  {origin:12s} rows={int(n):5d} draft_classes={k}")
+    if (classes_per_origin < 5).any():
+        click.echo(
+            "WARNING: <5 draft classes for some origins — keeping seeded "
+            "MLE multipliers. Re-run after more data is ingested."
+        )
+
+
 @scouting.command("fit")
 @click.option("--start", default=2010, type=int)
 @click.option("--end", default=2024, type=int)
 def scouting_fit_cmd(start: int, end: int) -> None:
     from sportscards.scouting.nba.features import build_feature_matrix
-    from sportscards.scouting.nba.ingest_bref import load_cohort
+    from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
     from sportscards.scouting.nba.prism import (
         concordance,
         predict_scores,
@@ -444,7 +523,7 @@ def scouting_fit_cmd(start: int, end: int) -> None:
         train_pairwise_model,
     )
 
-    prospects, outcomes = load_cohort(range(start, end + 1))
+    prospects, outcomes = build_unified_cohort(range(start, end + 1))
     X, y, groups, _ = build_feature_matrix(prospects, outcomes)
     model = train_pairwise_model(X, y, groups)
     save_model(model)
@@ -457,12 +536,12 @@ def scouting_fit_cmd(start: int, end: int) -> None:
 def scouting_score_cmd(draft_year: int | None) -> None:
     from sportscards.db.session import session_scope
     from sportscards.scouting.nba.features import build_feature_matrix
-    from sportscards.scouting.nba.ingest_bref import load_cohort
+    from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
     from sportscards.scouting.nba.prism import load_model, predict_scores
     from sportscards.scouting.nba.score import compute_stardom_premium, persist_scores
 
     years = range(draft_year, draft_year + 1) if draft_year else range(2010, 2025)
-    prospects, outcomes = load_cohort(years)
+    prospects, outcomes = build_unified_cohort(years)
     X, _, groups, slugs = build_feature_matrix(prospects, outcomes)
     model = load_model()
     scores = predict_scores(model, X)
