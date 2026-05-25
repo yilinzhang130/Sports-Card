@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, Any
 
 import click
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 
 @click.group()
@@ -236,12 +240,14 @@ def portfolio_plan_cmd(aum: float, tactical: bool) -> None:
     table = Table(title=f"Target portfolio (AUM ${aum:,.0f})")
     table.add_column("card_id", justify="right")
     table.add_column("sleeve")
+    table.add_column("signal_source")
     table.add_column("weight %", justify="right")
     table.add_column("$ value", justify="right")
     for p in sorted(positions, key=lambda x: (-abs(x.target_weight_pct), x.card_id)):
         table.add_row(
             str(p.card_id),
             p.sleeve,
+            p.signal_source,
             f"{p.target_weight_pct * 100:.2f}",
             f"${p.target_usd_value:,.0f}",
         )
@@ -532,11 +538,35 @@ def scouting_refit_mle_cmd() -> None:
         )
 
 
+@scouting.command("ingest-combine")
+@click.option(
+    "--year",
+    "years",
+    multiple=True,
+    type=int,
+    help="Draft year(s) to pull combine data for. Defaults to 2010-2024.",
+)
+def scouting_ingest_combine_cmd(years: tuple[int, ...]) -> None:
+    from sportscards.scouting.nba.ingest_combine import LiveCombineClient
+    from sportscards.scouting.nba.ingest_combine import ingest_year as ingest_combine_year
+
+    target_years = list(years) if years else list(range(2010, 2025))
+    client = LiveCombineClient()
+    for y in target_years:
+        click.echo(f"ingesting combine {y}…")
+        try:
+            ingest_combine_year(y, client=client)
+        except Exception as e:  # pragma: no cover - network failure modes
+            click.echo(f"  skipped {y}: {e}")
+    click.echo(f"done ({len(target_years)} years attempted)")
+
+
 @scouting.command("fit")
 @click.option("--start", default=2010, type=int)
 @click.option("--end", default=2024, type=int)
 def scouting_fit_cmd(start: int, end: int) -> None:
     from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_combine import load_combine_cohort
     from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
     from sportscards.scouting.nba.prism import (
         concordance,
@@ -545,12 +575,14 @@ def scouting_fit_cmd(start: int, end: int) -> None:
         train_pairwise_model,
     )
 
-    prospects, outcomes = build_unified_cohort(range(start, end + 1))
-    X, y, groups, _ = build_feature_matrix(prospects, outcomes)
+    years = range(start, end + 1)
+    prospects, outcomes = build_unified_cohort(years)
+    combine = load_combine_cohort(years)
+    X, y, groups, _ = build_feature_matrix(prospects, outcomes, combine=combine)
     model = train_pairwise_model(X, y, groups)
     save_model(model)
     c = concordance(predict_scores(model, X), y.to_numpy(), groups.to_numpy())
-    click.echo(f"trained: in-sample concordance={c:.3f}")
+    click.echo(f"trained: in-sample concordance={c:.3f}  (combine rows: {len(combine)})")
 
 
 @scouting.command("score")
@@ -558,19 +590,153 @@ def scouting_fit_cmd(start: int, end: int) -> None:
 def scouting_score_cmd(draft_year: int | None) -> None:
     from sportscards.db.session import session_scope
     from sportscards.scouting.nba.features import build_feature_matrix
+    from sportscards.scouting.nba.ingest_combine import load_combine_cohort
     from sportscards.scouting.nba.ingest_prospects import build_unified_cohort
     from sportscards.scouting.nba.prism import load_model, predict_scores
     from sportscards.scouting.nba.score import compute_stardom_premium, persist_scores
 
     years = range(draft_year, draft_year + 1) if draft_year else range(2010, 2025)
     prospects, outcomes = build_unified_cohort(years)
-    X, _, groups, slugs = build_feature_matrix(prospects, outcomes)
+    combine = load_combine_cohort(years)
+    X, _, groups, slugs = build_feature_matrix(prospects, outcomes, combine=combine)
     model = load_model()
     scores = predict_scores(model, X)
     df = compute_stardom_premium(slugs, groups, prospects["draft_pick"], scores)
     with session_scope() as s:
         n = persist_scores(s, df)
     click.echo(f"persisted {n} stardom scores ({len(df)} prospects scored)")
+
+
+@scouting.command("ingest-current-ncaa")
+@click.option("--season", required=True, help="Season label, e.g. '2025-26'.")
+def scouting_ingest_current_ncaa_cmd(season: str) -> None:
+    """Pull D-I per-100 stats for the in-progress NCAA season."""
+    from sportscards.scouting.nba.ingest_bref import (
+        LiveBRefClient,
+        ingest_current_ncaa_season,
+    )
+
+    path = ingest_current_ncaa_season(season, client=LiveBRefClient())
+    click.echo(f"wrote {path}")
+
+
+@scouting.command("refresh-mock-drafts")
+@click.option("--draft-year", required=True, type=int)
+def scouting_refresh_mock_drafts_cmd(draft_year: int) -> None:
+    """Snapshot the current mock-draft consensus across all sources."""
+    from sportscards.scouting.nba.mock_draft import (
+        LiveMockDraftClient,
+        refresh_mock_drafts,
+    )
+
+    written = refresh_mock_drafts(draft_year, client=LiveMockDraftClient())
+    click.echo(f"refreshed {len(written)} mock-draft snapshot(s)")
+
+
+@scouting.command("score-class")
+@click.option("--draft-year", required=True, type=int)
+@click.option("--season", required=True, help="Season label, e.g. '2025-26'.")
+@click.option(
+    "--as-of",
+    type=click.DateTime(["%Y-%m-%d"]),
+    default=None,
+    help="Snapshot date; defaults to today.",
+)
+def scouting_score_class_cmd(draft_year: int, season: str, as_of: datetime | None) -> None:
+    """Forward-looking score for a draft class; writes ``prospect_forecast``."""
+    from sportscards.db.session import session_scope
+    from sportscards.scouting.nba.score_undrafted import score_current_class
+
+    as_of_date = as_of.date() if as_of is not None else None
+    with session_scope() as s:
+        df = score_current_class(
+            draft_year=draft_year,
+            season=season,
+            as_of=as_of_date,
+            session=s,
+        )
+    click.echo(
+        f"scored {len(df)} prospects for draft_year={draft_year} "
+        f"({df['premium'].notna().sum()} with mock consensus)"
+    )
+
+
+@scouting.command("top-prospects")
+@click.option("--draft-year", required=True, type=int)
+@click.option("--limit", default=30, type=int)
+def scouting_top_prospects_cmd(draft_year: int, limit: int) -> None:
+    """Print the top-N prospects from the latest forecast snapshot."""
+    from sqlalchemy import select
+
+    from sportscards.db.models import ProspectForecast
+    from sportscards.db.session import session_scope
+    from sportscards.scouting.nba.prism import MODEL_VERSION
+
+    with session_scope() as s:
+        latest_as_of = s.execute(
+            select(func_max_as_of_date())
+            .where(ProspectForecast.draft_year == draft_year)
+            .where(ProspectForecast.model_version == MODEL_VERSION)
+        ).scalar_one_or_none()
+        if latest_as_of is None:
+            click.echo(
+                f"no prospect_forecast rows for draft_year={draft_year}; "
+                f"run `sportscards scouting score-class --draft-year {draft_year}` first."
+            )
+            return
+        rows = (
+            s.execute(
+                select(ProspectForecast)
+                .where(ProspectForecast.draft_year == draft_year)
+                .where(ProspectForecast.model_version == MODEL_VERSION)
+                .where(ProspectForecast.as_of_date == latest_as_of)
+                .where(ProspectForecast.premium.is_not(None))
+                .order_by(ProspectForecast.premium.desc())
+                .limit(limit)
+            )
+            .scalars()
+            .all()
+        )
+
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+    table = Table(title=f"Top {len(rows)} prospects — draft_year={draft_year} as_of={latest_as_of}")
+    table.add_column("#", justify="right")
+    table.add_column("Name")
+    table.add_column("Class")
+    table.add_column("Premium", justify="right")
+    table.add_column("Pairwise", justify="right")
+    table.add_column("Consensus", justify="right")
+    table.add_column("Sources", justify="right")
+    for i, r in enumerate(rows, start=1):
+        table.add_row(
+            str(i),
+            r.name,
+            "FR"
+            if r.is_underclassman and r.years_until_draft == 2
+            else "SO"
+            if r.is_underclassman
+            else "Upper",
+            f"{float(r.premium):+.3f}" if r.premium is not None else "—",
+            f"{float(r.pairwise_score):+.3f}" if r.pairwise_score is not None else "—",
+            f"{float(r.consensus_rank):.1f}" if r.consensus_rank is not None else "—",
+            str(r.sources_count or "—"),
+        )
+    console.print(table)
+
+
+def func_max_as_of_date() -> Any:
+    """Indirection — keeps the heavy ``func`` import out of the import-time
+    surface of this module's CLI loader. Returns ``MAX(as_of_date)`` over
+    ``prospect_forecast`` (caller chains its own WHERE).
+    """
+    from sqlalchemy import func
+
+    from sportscards.db.models import ProspectForecast
+
+    return func.max(ProspectForecast.as_of_date)
 
 
 @cli.group()

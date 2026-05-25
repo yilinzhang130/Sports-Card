@@ -43,10 +43,12 @@ NUMERICAL_FEATURES: list[str] = [
     "player_age_at_sale",  #  0
     "years_since_draft",  #  0
     "draft_pick",  #  0 (lower pick = better player but signal is noisy)
+    "stardom_premium",  # +1: more stardom → higher price
+    "stardom_premium_x_is_rookie",  # +1: amplified for rookies
     "catalyst_score",  #  0 (context-dependent; can flip sign)
     "catalyst_score_30d_change",  #  0
 ]
-NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, 0, 0)
+NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, +1, +1, 0, 0)
 
 BOOLEAN_FEATURES: list[str] = [
     "is_rookie",
@@ -54,8 +56,9 @@ BOOLEAN_FEATURES: list[str] = [
     "has_patch",
     "is_one_of_one",
     "era_modern",
+    "has_stardom_score",
 ]
-BOOLEAN_MONOTONE: tuple[int, ...] = (0, 0, 0, 0, 0)
+BOOLEAN_MONOTONE: tuple[int, ...] = (0, 0, 0, 0, 0, 0)
 
 CATEGORICAL_FEATURES: list[str] = ["set_tier", "team_market", "slab_grader"]
 

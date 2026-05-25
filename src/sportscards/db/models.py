@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -147,6 +148,34 @@ class PlayerStardomScore(Base):
     premium: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
     percentile_rank: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
     fit_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ProspectForecast(Base):
+    """Forward-looking pre-draft prospect score (PRISM, undrafted prospects).
+
+    Snapshotted by ``as_of_date`` so we can backtest "would we have found
+    Wemby in 2022?" later. ``player_slug`` is NOT a foreign key — the player
+    may not yet exist in ``player_master`` (they have not been drafted).
+    """
+
+    __tablename__ = "prospect_forecast"
+
+    player_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    draft_year: Mapped[int] = mapped_column(Integer, primary_key=True)
+    model_version: Mapped[str] = mapped_column(String(32), primary_key=True)
+    as_of_date: Mapped[datetime] = mapped_column(Date, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    premium: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    pairwise_score: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    consensus_rank: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    sources_count: Mapped[int | None] = mapped_column(Integer)
+    is_underclassman: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    years_until_draft: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    prior_league: Mapped[str] = mapped_column(String(16), nullable=False, default="NCAA")
+    n_games_played: Mapped[int | None] = mapped_column(Integer)
+    fit_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_prospect_forecast_draft_year", "draft_year", "as_of_date"),)
 
 
 class PopSnapshot(Base):

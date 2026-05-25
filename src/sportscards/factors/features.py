@@ -16,7 +16,7 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Card, Player, PopSnapshot, TxClean
+from sportscards.db.models import Card, Player, PlayerStardomScore, PopSnapshot, TxClean
 from sportscards.factors.catalyst import compute_catalyst_scores_bulk
 
 # ---------------------------------------------------------------------------
@@ -247,7 +247,49 @@ def build_features(session: Session) -> pd.DataFrame:
     df["team_market"] = df["team"].apply(team_market).astype(str)
     df["slab_grader"] = df["slab_grader"].astype(str)
 
-    # --- 13. Catalyst features (per player-day; one bulk query per day) -----
+    # --- Stardom premium (Phase 3 → Phase 2B integration) ---
+    score_rows = session.execute(
+        select(
+            PlayerStardomScore.player_id,
+            PlayerStardomScore.premium,
+            PlayerStardomScore.fit_at,
+        )
+    ).all()
+    scores = pd.DataFrame(score_rows, columns=["player_id", "premium", "fit_at"])
+
+    if scores.empty:
+        df["stardom_premium"] = np.nan
+        df["has_stardom_score"] = False
+    else:
+        scores["fit_at"] = _to_naive(scores["fit_at"])
+        scores["premium"] = scores["premium"].astype(float)
+        scores = scores.sort_values("fit_at")
+        df = df.sort_values("sold_at").reset_index(drop=True)
+        df = pd.merge_asof(
+            df,
+            scores,
+            left_on="sold_at",
+            right_on="fit_at",
+            by="player_id",
+            direction="backward",
+        )
+        df["has_stardom_score"] = df["premium"].notna()
+        df = df.rename(columns={"premium": "stardom_premium"})
+        df = df.drop(columns=["fit_at"])
+
+    # Fill missing premium with modern-rookie cohort median, else 0.
+    cohort_mask = (df.get("is_rookie", 0) == 1) & (df.get("era_modern", 0) == 1)
+    cohort_median = (
+        df.loc[cohort_mask, "stardom_premium"].dropna().astype(float).median()
+        if cohort_mask.any()
+        else 0.0
+    )
+    if pd.isna(cohort_median):
+        cohort_median = 0.0
+    df["stardom_premium"] = df["stardom_premium"].astype(float).fillna(cohort_median)
+    df["stardom_premium_x_is_rookie"] = df["stardom_premium"] * df["is_rookie"].astype(float)
+
+    # --- Catalyst features (per player-day; one bulk query per day) ---
     # Compute one score per distinct (player_id, sold_at_day) and broadcast
     # back. Intra-day variation is irrelevant — the score only steps when a
     # new event lands. as_of MUST be the row's sold_at to avoid leakage.
@@ -280,6 +322,7 @@ def build_features(session: Session) -> pd.DataFrame:
         # identifiers
         "tx_id",
         "sold_at",
+        "player_id",
         # target
         "log_price",
         # numerical
@@ -291,6 +334,8 @@ def build_features(session: Session) -> pd.DataFrame:
         "player_age_at_sale",
         "years_since_draft",
         "draft_pick",
+        "stardom_premium",
+        "stardom_premium_x_is_rookie",
         "catalyst_score",
         "catalyst_score_30d_change",
         # boolean (int 0/1)
@@ -299,6 +344,7 @@ def build_features(session: Session) -> pd.DataFrame:
         "has_patch",
         "is_one_of_one",
         "era_modern",
+        "has_stardom_score",
         # categorical (str)
         "set_tier",
         "team_market",
