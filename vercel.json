@@ -1,3 +1,10 @@
 {
-  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/$1" }]
+  "buildCommand": null,
+  "outputDirectory": null,
+  "installCommand": null,
+  "functions": {
+    "api/ebay-webhook.py": {
+      "runtime": "python3.12"
+    }
+  }
 }
