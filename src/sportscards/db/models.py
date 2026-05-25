@@ -311,3 +311,27 @@ class RepeatSalesIndex(Base):
     se: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
 
     __table_args__ = (Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),)
+
+
+class GradingEv(Base):
+    """TimescaleDB hypertable on as_of_date — daily grading optionality EVs."""
+
+    __tablename__ = "grading_ev"
+
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), primary_key=True)
+    as_of_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    grade_tier: Mapped[str] = mapped_column(String(16), primary_key=True)
+    gem_rate: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    p10_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    p9_price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    cost_to_grade: Mapped[Decimal] = mapped_column(Numeric(8, 2), nullable=False)
+    raw_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    ev: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    ev_per_dollar: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    sample_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    p10_pop: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (Index("ix_grading_ev_ev_per_dollar", "ev_per_dollar"),)

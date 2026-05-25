@@ -71,3 +71,32 @@ def test_each_case(case: dict) -> None:
     ok, msg = check_case(case)
     if not ok:
         pytest.xfail(msg)
+
+
+def test_raw_card_well_formed_marked_as_regex_raw():
+    from sportscards.parse.regex_parser import parse_title
+
+    r = parse_title("2018-19 Panini Prizm Luka Doncic #280 Silver Rookie RC")
+    assert r.slab_grader is None
+    assert r.slab_grade is None
+    assert r.method == "regex_raw"
+    assert r.confidence >= Decimal("0.85")  # bypass LLM fallback
+
+
+def test_raw_card_missing_card_number_stays_regex():
+    from sportscards.parse.regex_parser import parse_title
+
+    r = parse_title("2018 Panini Prizm Luka Doncic Silver")
+    # no card_number → not well-formed-raw → don't bump method
+    assert r.method == "regex"
+    assert r.confidence < Decimal("0.85")
+
+
+def test_raw_router_does_not_call_llm(monkeypatch):
+    from sportscards.parse import router as r
+
+    called = []
+    monkeypatch.setattr(r, "parse_title_llm", lambda t: called.append(t) or None)
+    out = r.parse_title("2018-19 Panini Prizm Luka Doncic #280 Silver Rookie")
+    assert out.method == "regex_raw"
+    assert called == []

@@ -15,8 +15,14 @@ REGEX_CONFIDENCE_FLOOR = Decimal("0.85")
 
 
 def parse_title(title: str, *, allow_llm: bool = True) -> ParsedTitle:
-    """Try regex first; fall back to DeepSeek if confidence is below floor."""
+    """Try regex first; fall back to DeepSeek if confidence is below floor.
+
+    ``regex_raw`` results are deterministic and skip the LLM fallback even
+    when confidence is exactly at the floor.
+    """
     regex_result = parse_title_regex(title)
+    if regex_result.method == "regex_raw":
+        return regex_result
     if regex_result.confidence >= REGEX_CONFIDENCE_FLOOR or not allow_llm:
         return regex_result
     try:

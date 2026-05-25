@@ -281,6 +281,25 @@ def data_health(engine: Engine | None = None) -> dict[str, pd.DataFrame]:
     return {"raw_vs_clean": raw_vs_clean, "failures": failures}
 
 
+# --- Grading EV leaderboard (grading-ev) --------------------------------------
+
+
+def grading_ev_leaderboard(engine: Engine | None = None, n: int = 50) -> pd.DataFrame:
+    """Top-N cards by EV-per-dollar for raw→PSA 10 grading, most recent snapshot."""
+    eng = _engine(engine)
+    _require(eng, "grading_ev", phase="grading-ev")
+    sql = """
+        SELECT g.*, c.year, c.set_name, c.parallel, p.name AS player
+        FROM grading_ev g
+        JOIN card_master c ON c.card_id = g.card_id
+        LEFT JOIN player_master p ON p.player_id = c.player_id
+        WHERE g.as_of_date = (SELECT MAX(as_of_date) FROM grading_ev)
+        ORDER BY g.ev_per_dollar DESC NULLS LAST
+        LIMIT :n
+    """
+    return pd.read_sql(text(sql), eng, params={"n": n})
+
+
 # --- Letter metrics bundle -----------------------------------------------------
 
 

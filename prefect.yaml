@@ -40,3 +40,12 @@ deployments:
       - cron: "0 8 * * *"
         timezone: America/Los_Angeles
         active: true
+
+  - name: daily-grading-ev
+    entrypoint: src/sportscards/flows/daily_grading_ev.py:daily_grading_ev_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "0 9 * * *"
+        timezone: America/Los_Angeles
+        active: true

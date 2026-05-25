@@ -64,6 +64,11 @@ def _cached_health() -> dict[str, pd.DataFrame]:
 
 
 @st.cache_data(ttl=300)
+def _cached_grading_ev() -> pd.DataFrame:
+    return queries.grading_ev_leaderboard()
+
+
+@st.cache_data(ttl=300)
 def _cached_factor_panel() -> pd.DataFrame:
     return queries.factor_panel_latest()
 
@@ -265,6 +270,33 @@ def _portfolio_tab() -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+def _grading_ev_tab() -> None:
+    st.header("Grading EV — raw → PSA 10 optionality")
+    try:
+        df = _cached_grading_ev()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    if df.empty:
+        st.write("No grading-EV rows yet — run `sportscards ev compute`.")
+        return
+
+    def _highlight(v):
+        if pd.isna(v):
+            return ""
+        if v > 0.30:
+            return "background-color: #d4edda"
+        if v < 0:
+            return "background-color: #f8d7da"
+        return ""
+
+    st.dataframe(
+        df.style.map(_highlight, subset=["ev_per_dollar"]),
+        use_container_width=True,
+    )
+    st.caption("Small sample_size = noisier gem_rate estimate; treat <20 as speculative.")
+
+
 def _factor_panel_tab() -> None:
     st.header("Factor Panel — Momentum + Liquidity")
     try:
@@ -305,6 +337,7 @@ def render_dashboard() -> None:
             "Catalysts",
             "Portfolio",
             "Factor panel",
+            "Grading EV",
             "Data Health",
         ]
     )
@@ -323,6 +356,8 @@ def render_dashboard() -> None:
     with tabs[6]:
         _factor_panel_tab()
     with tabs[7]:
+        _grading_ev_tab()
+    with tabs[8]:
         _health_tab()
 
 
