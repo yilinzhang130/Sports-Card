@@ -68,6 +68,7 @@ class TargetPosition:
     sleeve: Sleeve
     target_weight_pct: float
     target_usd_value: float
+    signal_source: str  # "anchor" | "factor" | "prospect"
 
 
 def _equal_weight_with_cap(
@@ -76,6 +77,7 @@ def _equal_weight_with_cap(
     per_name_cap: float,
     sleeve_label: Sleeve,
     aum: float,
+    signal_source: str,
 ) -> tuple[list[TargetPosition], float]:
     """Distribute ``sleeve_weight`` equally subject to ``per_name_cap``.
 
@@ -111,6 +113,7 @@ def _equal_weight_with_cap(
             sleeve=sleeve_label,
             target_weight_pct=w,
             target_usd_value=w * aum,
+            signal_source=signal_source,
         )
         for cid, w in out.items()
     ]
@@ -187,7 +190,7 @@ def build_portfolio(
 
     anchor_ids = universe.anchors_df["card_id"].tolist() if not universe.anchors_df.empty else []
     anchor_positions, anchor_unalloc = _equal_weight_with_cap(
-        anchor_ids, anchor_w, cfg.anchor_position_cap_pct, "anchor", aum
+        anchor_ids, anchor_w, cfg.anchor_position_cap_pct, "anchor", aum, "anchor"
     )
     positions.extend(anchor_positions)
 
@@ -202,12 +205,12 @@ def build_portfolio(
             long_w = factor_w
             short_w = 0.0
         lp, _ = _equal_weight_with_cap(
-            long_ids, long_w, cfg.other_position_cap_pct, "factor_long", aum
+            long_ids, long_w, cfg.other_position_cap_pct, "factor_long", aum, "factor"
         )
         positions.extend(lp)
         if short_ids:
             sp, _ = _equal_weight_with_cap(
-                short_ids, short_w, cfg.other_position_cap_pct, "factor_short", aum
+                short_ids, short_w, cfg.other_position_cap_pct, "factor_short", aum, "factor"
             )
             # encode shorts as negative
             positions.extend(
@@ -216,6 +219,7 @@ def build_portfolio(
                     sleeve="factor_short",
                     target_weight_pct=-p.target_weight_pct,
                     target_usd_value=-p.target_usd_value,
+                    signal_source="factor",
                 )
                 for p in sp
             )
@@ -224,7 +228,7 @@ def build_portfolio(
         df = universe.prospect_df.nlargest(cfg.prospect_top_n, "stardom_score")
         prospect_ids = df["card_id"].tolist()
         pp, _ = _equal_weight_with_cap(
-            prospect_ids, prospect_w, cfg.prospect_per_name_cap_pct, "prospect", aum
+            prospect_ids, prospect_w, cfg.prospect_per_name_cap_pct, "prospect", aum, "prospect"
         )
         positions.extend(pp)
 

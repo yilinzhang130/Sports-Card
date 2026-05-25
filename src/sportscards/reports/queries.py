@@ -86,6 +86,39 @@ def stardom_scores(engine: Engine | None = None, draft_year: int | None = None) 
     return pd.read_sql(text(sql), eng, params=params)
 
 
+def forward_prospects(
+    engine: Engine | None = None,
+    draft_year: int | None = None,
+) -> pd.DataFrame:
+    """Latest forward-looking prospect snapshot.
+
+    Returns one row per prospect from the most recent ``as_of_date``
+    (per draft_year), ranked by premium DESC. If ``draft_year`` is None,
+    the table's max draft_year is used (typically the upcoming class).
+    """
+    eng = _engine(engine)
+    _require(eng, "prospect_forecast", "Phase 3")
+    if draft_year is None:
+        max_year = pd.read_sql(text("SELECT MAX(draft_year) AS y FROM prospect_forecast"), eng)[
+            "y"
+        ].iloc[0]
+        if max_year is None:
+            return pd.DataFrame()
+        draft_year = int(max_year)
+    sql = text(
+        "SELECT player_slug, name, draft_year, premium, pairwise_score, "
+        "       consensus_rank, sources_count, is_underclassman, "
+        "       years_until_draft, prior_league, n_games_played, as_of_date "
+        "FROM prospect_forecast "
+        "WHERE draft_year = :dy "
+        "  AND as_of_date = ("
+        "      SELECT MAX(as_of_date) FROM prospect_forecast WHERE draft_year = :dy"
+        "  )"
+    )
+    df = pd.read_sql(sql, eng, params={"dy": draft_year})
+    return df.sort_values("premium", ascending=False, na_position="last").reset_index(drop=True)
+
+
 def player_price_history(player_id: int, engine: Engine | None = None) -> pd.DataFrame:
     eng = _engine(engine)
     _require(eng, "tx_clean", "Phase 1")

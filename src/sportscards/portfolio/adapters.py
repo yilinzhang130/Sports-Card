@@ -80,47 +80,65 @@ def load_mispricing(session: Any, as_of: datetime) -> pd.DataFrame | None:
 
 
 def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:
-    """Phase 3 output (``player_stardom_score``). Returns None if absent.
+    """For each player with a stardom score whose fit_at <= as_of and whose
+    draft_year is within 5 years of as_of's year, return one row per player
+    keyed on their flagship rookie card (Prizm Silver RC > Prizm Base RC >
+    Topps Chrome RC). Columns: player_id, card_id, stardom_score, draft_year,
+    computed_at. Returns None if no eligible scores/cards exist."""
+    from sqlalchemy import select as _select
 
-    Joins ``player_stardom_score`` to ``card_master`` so the prospect sleeve
-    can be expressed in card_id units. Stardom is keyed by (player_id,
-    model_version); we pick each player's latest ``fit_at`` < as_of and
-    expand to their rookie cards.
-    """
+    from sportscards.db.models import Card as _Card
+    from sportscards.db.models import PlayerStardomScore as _PSS
+
     if not _has_table(session, "player_stardom_score"):
         return None
-    from sqlalchemy import text
 
-    rows = (
-        session.execute(
-            text(
-                "SELECT c.card_id, s.premium AS stardom_score, s.fit_at AS computed_at "
-                "FROM player_stardom_score s "
-                "JOIN card_master c ON c.player_id = s.player_id "
-                "WHERE s.fit_at < :as_of AND c.is_rookie = true"
-            ),
-            {"as_of": as_of},
-        )
-        .mappings()
-        .all()
-    )
-    if not rows:
-        return None
-    df = pd.DataFrame(rows)
-    # Attach last_price from tx_clean for sizing
-    from sqlalchemy import func
-
-    from sportscards.db.models import TxClean
-
-    price_rows = session.execute(
-        select(TxClean.card_id, func.avg(TxClean.price_usd).label("last_price"))
-        .where(TxClean.card_id.in_(df["card_id"].tolist()))
-        .where(TxClean.sold_at < as_of)
-        .group_by(TxClean.card_id)
+    score_rows = session.execute(
+        _select(
+            _PSS.player_id,
+            _PSS.premium,
+            _PSS.draft_year,
+            _PSS.fit_at,
+        ).where(_PSS.fit_at <= as_of)
     ).all()
-    price_map = {r.card_id: float(r.last_price) for r in price_rows}
-    df["last_price"] = df["card_id"].map(price_map)
-    return df
+    if not score_rows:
+        return None
+    scores = pd.DataFrame(score_rows, columns=["player_id", "premium", "draft_year", "fit_at"])
+    scores = scores.sort_values("fit_at").groupby("player_id", as_index=False).tail(1)
+    scores = scores[scores["draft_year"] >= as_of.year - 5]
+    if scores.empty:
+        return None
+
+    card_rows = session.execute(
+        _select(_Card.card_id, _Card.player_id, _Card.set_name, _Card.parallel)
+        .where(_Card.is_rookie == True)  # noqa: E712
+        .where(_Card.player_id.in_(scores["player_id"].tolist()))
+    ).all()
+    if not card_rows:
+        return None
+    cards = pd.DataFrame(card_rows, columns=["card_id", "player_id", "set_name", "parallel"])
+
+    def _rank(row: pd.Series) -> int:
+        sn = (row["set_name"] or "").lower()
+        par = (row["parallel"] or "").lower()
+        if "prizm" in sn and "silver" in par:
+            return 0
+        if "prizm" in sn and par in ("base", ""):
+            return 1
+        if "topps chrome" in sn:
+            return 2
+        return 9
+
+    cards["rank"] = cards.apply(_rank, axis=1)
+    cards = cards[cards["rank"] < 9]
+    if cards.empty:
+        return None
+    cards = cards.sort_values(["player_id", "rank"]).groupby("player_id", as_index=False).head(1)
+
+    out = cards.merge(scores, on="player_id", how="inner")
+    return out.rename(columns={"premium": "stardom_score", "fit_at": "computed_at"})[
+        ["player_id", "card_id", "stardom_score", "draft_year", "computed_at"]
+    ]
 
 
 def load_price_panel(
