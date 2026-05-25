@@ -216,12 +216,14 @@ def portfolio_plan_cmd(aum: float) -> None:
     table = Table(title=f"Target portfolio (AUM ${aum:,.0f})")
     table.add_column("card_id", justify="right")
     table.add_column("sleeve")
+    table.add_column("signal_source")
     table.add_column("weight %", justify="right")
     table.add_column("$ value", justify="right")
     for p in sorted(positions, key=lambda x: (-abs(x.target_weight_pct), x.card_id)):
         table.add_row(
             str(p.card_id),
             p.sleeve,
+            p.signal_source,
             f"{p.target_weight_pct * 100:.2f}",
             f"${p.target_usd_value:,.0f}",
         )
