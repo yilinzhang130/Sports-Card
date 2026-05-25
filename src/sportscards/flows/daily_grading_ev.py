@@ -35,6 +35,8 @@ def daily_grading_ev_flow(
             .all()
         )
         for cid in cand_ids:
+            if cid is None:
+                continue
             try:
                 ev = compute_grading_ev(
                     s,

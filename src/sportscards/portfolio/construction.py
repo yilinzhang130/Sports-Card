@@ -265,6 +265,7 @@ def build_portfolio(
                             sleeve="grading_arbitrage",
                             target_weight_pct=w_pct,
                             target_usd_value=cost,
+                            signal_source="grading_arbitrage",
                         )
                     )
                     sleeve_budget -= cost
