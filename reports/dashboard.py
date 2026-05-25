@@ -43,6 +43,11 @@ def _cached_health() -> dict[str, pd.DataFrame]:
     return queries.data_health()
 
 
+@st.cache_data(ttl=300)
+def _cached_grading_ev() -> pd.DataFrame:
+    return queries.grading_ev_leaderboard()
+
+
 def _placeholder(phase: str) -> None:
     st.info(f"Coming with {phase}.")
 
@@ -123,6 +128,33 @@ def _portfolio_tab() -> None:
     st.plotly_chart(fig, use_container_width=True)
 
 
+def _grading_ev_tab() -> None:
+    st.header("Grading EV — raw → PSA 10 optionality")
+    try:
+        df = _cached_grading_ev()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    if df.empty:
+        st.write("No grading-EV rows yet — run `sportscards ev compute`.")
+        return
+
+    def _highlight(v):
+        if pd.isna(v):
+            return ""
+        if v > 0.30:
+            return "background-color: #d4edda"
+        if v < 0:
+            return "background-color: #f8d7da"
+        return ""
+
+    st.dataframe(
+        df.style.map(_highlight, subset=["ev_per_dollar"]),
+        use_container_width=True,
+    )
+    st.caption("Small sample_size = noisier gem_rate estimate; treat <20 as speculative.")
+
+
 def _health_tab() -> None:
     st.header("Data Health")
     try:
@@ -140,7 +172,7 @@ def _health_tab() -> None:
 def render_dashboard() -> None:
     st.set_page_config(page_title="sportscards-quant", layout="wide")
     st.title("sportscards-quant")
-    tabs = st.tabs(["Market", "Mispricing", "Prospects", "Portfolio", "Data Health"])
+    tabs = st.tabs(["Market", "Mispricing", "Prospects", "Portfolio", "Grading EV", "Data Health"])
     with tabs[0]:
         _market_tab()
     with tabs[1]:
@@ -150,6 +182,8 @@ def render_dashboard() -> None:
     with tabs[3]:
         _portfolio_tab()
     with tabs[4]:
+        _grading_ev_tab()
+    with tabs[5]:
         _health_tab()
 
 
