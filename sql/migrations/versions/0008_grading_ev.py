@@ -1,11 +1,11 @@
 """grading_ev table for raw → PSA 10 optionality model.
 
-Revision ID: 0007
-Revises: 0006
+Revision ID: 0008
+Revises: 0007
 Create Date: 2026-05-25
 
-Chained after 0006_prospect_forecast (forward-looking PRISM) which landed
-on main while this branch was open.
+Chained after 0007_factor_panel (momentum + liquidity factors) which
+landed on main while this branch was open.
 """
 
 from collections.abc import Sequence
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0007"
-down_revision: str | None = "0006"
+revision: str = "0008"
+down_revision: str | None = "0007"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

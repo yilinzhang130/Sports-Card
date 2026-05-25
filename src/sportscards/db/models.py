@@ -201,6 +201,33 @@ class TxMispricing(Base):
     __table_args__ = (Index("ix_tx_mispricing_residual", "residual"),)
 
 
+class FactorPanel(Base):
+    """Per-card momentum + liquidity factor snapshot. Timescale hypertable on as_of_date."""
+
+    __tablename__ = "factor_panel"
+
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), primary_key=True)
+    as_of_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    r30: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    r90: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    r365: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    cs_momentum_pct: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    is_hyped: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sales_count_90d: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dollar_volume_90d: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    bid_ask_proxy: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    last_sale_recency_days: Mapped[int | None] = mapped_column(Integer)
+    liquidity_tier: Mapped[str] = mapped_column(String(1), nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_factor_panel_as_of", "as_of_date"),
+        Index("ix_factor_panel_card_asof", "card_id", "as_of_date"),
+    )
+
+
 class RepeatSalesIndex(Base):
     """Cert-based repeat-sales index. TimescaleDB hypertable on period_start.
 

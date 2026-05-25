@@ -425,6 +425,37 @@ def rank_mispricing_cmd(top: int) -> None:
 
 
 @cli.group()
+def factor() -> None:
+    """Factor panel (momentum + liquidity) commands."""
+
+
+@factor.command("compute-panel")
+@click.option(
+    "--as-of",
+    default=None,
+    help="YYYY-MM-DD as-of date (default: today UTC).",
+)
+@click.option("--lookback", default=90, type=int, help="Trailing window in days.")
+def factor_compute_panel_cmd(as_of: str | None, lookback: int) -> None:
+    """Compute and persist factor_panel rows for the universe."""
+    from datetime import UTC
+    from datetime import date as _date
+    from datetime import datetime as _datetime
+
+    from sportscards.db.session import session_scope
+    from sportscards.factors.factor_panel import persist_panel
+
+    if as_of is None:
+        as_of_dt = _datetime.now(tz=UTC)
+    else:
+        as_of_dt = _datetime.combine(_date.fromisoformat(as_of), _datetime.min.time())
+
+    with session_scope() as s:
+        n = persist_panel(s, as_of_dt, lookback_days=lookback)
+    click.echo(f"factor_panel rows written: {n} (as_of={as_of_dt:%Y-%m-%d})")
+
+
+@cli.group()
 def scouting() -> None:
     """NBA prospect scouting model (PRISM-style pairwise CatBoost)."""
 

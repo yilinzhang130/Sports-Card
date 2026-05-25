@@ -119,8 +119,8 @@ def test_no_lookahead_future_score_excluded(session):
 # --- Hedonic v2 model tests ---
 
 
-def test_model_version_is_v2():
-    assert MODEL_VERSION == "hedonic_v2"
+def test_model_version_is_v3():
+    assert MODEL_VERSION == "hedonic_v3"
 
 
 def test_high_stardom_lifts_rookie_fitted_price(session):

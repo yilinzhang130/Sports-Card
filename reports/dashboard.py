@@ -53,6 +53,11 @@ def _cached_grading_ev() -> pd.DataFrame:
     return queries.grading_ev_leaderboard()
 
 
+@st.cache_data(ttl=300)
+def _cached_factor_panel() -> pd.DataFrame:
+    return queries.factor_panel_latest()
+
+
 def _placeholder(phase: str) -> None:
     st.info(f"Coming with {phase}.")
 
@@ -237,6 +242,20 @@ def _grading_ev_tab() -> None:
     st.caption("Small sample_size = noisier gem_rate estimate; treat <20 as speculative.")
 
 
+def _factor_panel_tab() -> None:
+    st.header("Factor Panel — Momentum + Liquidity")
+    try:
+        df = _cached_factor_panel()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    if df.empty:
+        st.write("No factor_panel snapshot yet. Run `sportscards factor compute-panel`.")
+        return
+    st.caption(f"As of {df['as_of_date'].iloc[0]} — {len(df)} cards")
+    st.dataframe(df, use_container_width=True)
+
+
 def _health_tab() -> None:
     st.header("Data Health")
     try:
@@ -261,6 +280,7 @@ def render_dashboard() -> None:
             "Prospects",
             "Forward Prospects",
             "Portfolio",
+            "Factor panel",
             "Grading EV",
             "Data Health",
         ]
@@ -276,8 +296,10 @@ def render_dashboard() -> None:
     with tabs[4]:
         _portfolio_tab()
     with tabs[5]:
-        _grading_ev_tab()
+        _factor_panel_tab()
     with tabs[6]:
+        _grading_ev_tab()
+    with tabs[7]:
         _health_tab()
 
 
