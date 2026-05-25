@@ -16,7 +16,14 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Card, Player, PlayerStardomScore, PopSnapshot, TxClean
+from sportscards.db.models import (
+    Card,
+    FactorPanel,
+    Player,
+    PlayerStardomScore,
+    PopSnapshot,
+    TxClean,
+)
 
 # ---------------------------------------------------------------------------
 # Per-card categorical helpers
@@ -199,6 +206,58 @@ def build_features(session: Session) -> pd.DataFrame:
     _asof_pop(10, "pop_psa10")
     _asof_pop(9, "pop_psa9")
 
+    # --- 5b. Asof-join factor_panel (momentum + liquidity) ----------------
+    fp_rows = session.execute(
+        select(
+            FactorPanel.card_id,
+            FactorPanel.as_of_date,
+            FactorPanel.cs_momentum_pct,
+            FactorPanel.is_hyped,
+            FactorPanel.sales_count_90d,
+            FactorPanel.bid_ask_proxy,
+            FactorPanel.liquidity_tier,
+        )
+    ).all()
+    fp_cols = [
+        "card_id",
+        "as_of_date",
+        "cs_momentum_pct",
+        "is_hyped",
+        "sales_count_90d",
+        "bid_ask_proxy",
+        "liquidity_tier",
+    ]
+    fp = pd.DataFrame(fp_rows, columns=fp_cols) if fp_rows else pd.DataFrame(columns=fp_cols)
+    if not fp.empty:
+        fp["as_of_date"] = _to_naive(fp["as_of_date"])
+        fp["cs_momentum_pct"] = pd.to_numeric(fp["cs_momentum_pct"], errors="coerce")
+        fp["sales_count_90d"] = pd.to_numeric(fp["sales_count_90d"], errors="coerce").fillna(0)
+        fp["bid_ask_proxy"] = pd.to_numeric(fp["bid_ask_proxy"], errors="coerce")
+        fp["is_hyped"] = fp["is_hyped"].astype(bool)
+        fp = fp.sort_values("as_of_date").reset_index(drop=True)
+        merged_fp = pd.merge_asof(
+            df.sort_values("sold_at"),
+            fp,
+            left_on="sold_at",
+            right_on="as_of_date",
+            by="card_id",
+            direction="backward",
+        )
+        for col in (
+            "cs_momentum_pct",
+            "is_hyped",
+            "sales_count_90d",
+            "bid_ask_proxy",
+            "liquidity_tier",
+        ):
+            df[col] = merged_fp[col].to_numpy()
+    else:
+        df["cs_momentum_pct"] = np.nan
+        df["is_hyped"] = False
+        df["sales_count_90d"] = 0
+        df["bid_ask_proxy"] = np.nan
+        df["liquidity_tier"] = "D"
+
     df["pop_psa9_or_better"] = df["pop_psa10"].astype(float) + df["pop_psa9"].astype(float)
 
     # --- 7. log1p pop transforms (NaN-preserving) --------------------------
@@ -245,6 +304,14 @@ def build_features(session: Session) -> pd.DataFrame:
     df["set_tier"] = df["set_name"].apply(set_tier).astype(str)
     df["team_market"] = df["team"].apply(team_market).astype(str)
     df["slab_grader"] = df["slab_grader"].astype(str)
+
+    # --- Momentum + liquidity feature post-processing ---------------------
+    df["cs_momentum_pct"] = pd.to_numeric(df["cs_momentum_pct"], errors="coerce").fillna(0.5)
+    df["bid_ask_proxy"] = pd.to_numeric(df["bid_ask_proxy"], errors="coerce").fillna(0.0)
+    df["sales_count_90d"] = pd.to_numeric(df["sales_count_90d"], errors="coerce").fillna(0.0)
+    df["log_sales_count_90d"] = np.log1p(df["sales_count_90d"].astype(float))
+    df["is_hyped"] = df["is_hyped"].fillna(False).astype(bool).astype(int)
+    df["liquidity_tier"] = df["liquidity_tier"].fillna("D").astype(str)
 
     # --- Stardom premium (Phase 3 → Phase 2B integration) ---
     score_rows = session.execute(
@@ -310,10 +377,16 @@ def build_features(session: Session) -> pd.DataFrame:
         "has_patch",
         "is_one_of_one",
         "era_modern",
+        # momentum + liquidity
+        "cs_momentum_pct",
+        "is_hyped",
+        "log_sales_count_90d",
+        "bid_ask_proxy",
         # categorical (str)
         "set_tier",
         "team_market",
         "slab_grader",
+        "liquidity_tier",
         "stardom_premium",
         "has_stardom_score",
         "stardom_premium_x_is_rookie",
