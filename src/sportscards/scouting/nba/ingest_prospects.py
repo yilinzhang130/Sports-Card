@@ -25,7 +25,6 @@ from sportscards.scouting.nba.ingest_bref import (
 )
 from sportscards.scouting.nba.ingest_bref import (
     PROSPECT_COLUMNS,
-    load_cohort,
 )
 from sportscards.scouting.nba.ingest_euro import (
     CACHE_DIR as EURO_CACHE_DIR,
@@ -121,7 +120,9 @@ def _load_ncaa_safe(
         prospects["years_in_prior_league"] = 1
     else:
         logger.warning("no NCAA cache for years %s — using empty frame", years)
-        prospects = pd.DataFrame(columns=list(PROSPECT_COLUMNS) + ["prospect_origin", "years_in_prior_league"])
+        prospects = pd.DataFrame(
+            columns=list(PROSPECT_COLUMNS) + ["prospect_origin", "years_in_prior_league"]
+        )
     if outcome_frames:
         outcomes = pd.concat(outcome_frames, ignore_index=True)
     else:

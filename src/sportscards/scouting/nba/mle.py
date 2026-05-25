@@ -47,4 +47,5 @@ def load_mle_table(path: Path = SEED_PATH) -> dict[str, LeagueMLE]:
 def mle_for(origin: str) -> LeagueMLE:
     table = load_mle_table()
     key = (origin or DEFAULT_ORIGIN).upper()
-    return table.get(key, table.get(DEFAULT_ORIGIN, {"mle": DEFAULT_MLE, "strength_rank": DEFAULT_STRENGTH_RANK}))
+    fallback: LeagueMLE = {"mle": DEFAULT_MLE, "strength_rank": DEFAULT_STRENGTH_RANK}
+    return table.get(key, table.get(DEFAULT_ORIGIN, fallback))

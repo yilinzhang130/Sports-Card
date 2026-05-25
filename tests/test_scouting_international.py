@@ -168,13 +168,13 @@ def _wemby_2023_class() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Tiny 5-prospect 2023 class so the pairwise model has something to
     rank. Synthetic — only Wembanyama's row comes from EuroLeague.
     """
+    # (slug, name, pick, pos, age, usg, ts, trb, ast, stl, blk, sos, recruit, true_bpm)
     rows = [
-        # (slug, name, pick, pos, age, usg, ts, trb, ast, stl, blk, sos, recruit, true_bpm)
-        ("scoot", "Scoot Henderson", 3, "PG", 19.2, 30.0, 0.55, 6.0, 28.0, 1.5, 0.5, 7.5, 0.95, 12.0),
-        ("brandon_miller", "Brandon Miller", 2, "SF", 20.1, 27.0, 0.58, 8.0, 6.0, 1.4, 1.5, 8.0, 0.90, 10.0),
-        ("amen_thompson", "Amen Thompson", 4, "PG", 20.2, 26.0, 0.57, 7.5, 22.0, 1.8, 0.8, 6.5, 0.88, 11.0),
-        ("ausar_thompson", "Ausar Thompson", 5, "SF", 20.2, 24.0, 0.55, 8.5, 15.0, 1.9, 1.0, 6.5, 0.86, 9.0),
-        ("jarace_walker", "Jarace Walker", 8, "PF", 19.6, 22.0, 0.56, 10.5, 5.5, 1.5, 3.5, 7.0, 0.92, 7.5),
+        ("scoot", "Scoot H.", 3, "PG", 19.2, 30.0, 0.55, 6.0, 28.0, 1.5, 0.5, 7.5, 0.95, 12.0),
+        ("bmiller", "Brandon M.", 2, "SF", 20.1, 27.0, 0.58, 8.0, 6.0, 1.4, 1.5, 8.0, 0.90, 10.0),
+        ("amen", "Amen T.", 4, "PG", 20.2, 26.0, 0.57, 7.5, 22.0, 1.8, 0.8, 6.5, 0.88, 11.0),
+        ("ausar", "Ausar T.", 5, "SF", 20.2, 24.0, 0.55, 8.5, 15.0, 1.9, 1.0, 6.5, 0.86, 9.0),
+        ("jarace", "Jarace W.", 8, "PF", 19.6, 22.0, 0.56, 10.5, 5.5, 1.5, 3.5, 7.0, 0.92, 7.5),
     ]
     prospects = pd.DataFrame(
         [
