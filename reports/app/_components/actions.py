@@ -189,3 +189,13 @@ def daily_psa_pop() -> dict[str, Any]:
 
     n = daily_psa_pop_flow()
     return {"snapshots_written": n}
+
+
+def parse_pending(*, batch_size: int = 1000, allow_llm: bool = True) -> dict[str, Any]:
+    """Mirror ``sportscards parse-pending`` — re-run parser (with optional LLM) on failures."""
+    from sportscards.flows.parse_pending import parse_pending_flow
+
+    result = parse_pending_flow(batch_size=batch_size, allow_llm=allow_llm)
+    if isinstance(result, dict):
+        return result
+    return {"result": str(result)}
