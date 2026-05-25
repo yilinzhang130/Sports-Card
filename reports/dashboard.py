@@ -34,6 +34,11 @@ def _cached_player_prices(player_id: int) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=300)
+def _cached_forward_prospects() -> pd.DataFrame:
+    return queries.forward_prospects()
+
+
+@st.cache_data(ttl=300)
 def _cached_backtest() -> pd.DataFrame:
     return queries.backtest_nav()
 
@@ -109,6 +114,28 @@ def _prospect_tab() -> None:
             st.plotly_chart(fig, use_container_width=True)
 
 
+def _forward_prospects_tab() -> None:
+    st.header("Forward Prospects")
+    st.caption(
+        "Pre-draft PRISM scores for current-season NCAA prospects. "
+        "Premium = pairwise percentile − mock-draft consensus percentile. "
+        "Positive = market under-prices the prospect."
+    )
+    try:
+        df = _cached_forward_prospects()
+    except TableMissing as e:
+        _placeholder(e.phase)
+        return
+    if df.empty:
+        st.info(
+            "No forecasts yet. Run "
+            "`sportscards scouting score-class --draft-year YYYY --season 2025-26` "
+            "to populate."
+        )
+        return
+    st.dataframe(df, use_container_width=True)
+
+
 def _portfolio_tab() -> None:
     st.header("Portfolio")
     try:
@@ -140,7 +167,9 @@ def _health_tab() -> None:
 def render_dashboard() -> None:
     st.set_page_config(page_title="sportscards-quant", layout="wide")
     st.title("sportscards-quant")
-    tabs = st.tabs(["Market", "Mispricing", "Prospects", "Portfolio", "Data Health"])
+    tabs = st.tabs(
+        ["Market", "Mispricing", "Prospects", "Forward Prospects", "Portfolio", "Data Health"]
+    )
     with tabs[0]:
         _market_tab()
     with tabs[1]:
@@ -148,8 +177,10 @@ def render_dashboard() -> None:
     with tabs[2]:
         _prospect_tab()
     with tabs[3]:
-        _portfolio_tab()
+        _forward_prospects_tab()
     with tabs[4]:
+        _portfolio_tab()
+    with tabs[5]:
         _health_tab()
 
 
