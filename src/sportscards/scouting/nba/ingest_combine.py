@@ -23,9 +23,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Protocol, cast
+from typing import Protocol, cast
 
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential

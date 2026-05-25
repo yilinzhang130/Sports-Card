@@ -16,7 +16,6 @@ import pytest
 from sportscards.scouting.nba import features as feat
 from sportscards.scouting.nba import ingest_combine, prism
 
-
 # ---------------------------------------------------------------------------
 # Synthetic combine cohort
 # ---------------------------------------------------------------------------
