@@ -16,6 +16,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 Sleeve = Literal["anchor", "factor_long", "factor_short", "prospect"]
@@ -102,8 +103,26 @@ def _equal_weight_with_cap(
     return positions, max(remaining, 0.0)
 
 
+def _apply_liquidity_hype_filters(
+    factor_df: pd.DataFrame, *, drop_hyped: bool
+) -> pd.DataFrame:
+    """Drop tier-D rows always; drop hyped rows when ``drop_hyped`` (long side)."""
+    if factor_df.empty:
+        return factor_df
+    out = factor_df
+    if "liquidity_tier" in out.columns:
+        out = out[out["liquidity_tier"] != "D"]
+    if drop_hyped and "is_hyped" in out.columns:
+        out = out[~out["is_hyped"].fillna(False).astype(bool)]
+    return out
+
+
 def _select_factor_long(factor_df: pd.DataFrame, decile: int) -> list[int]:
-    """Top-decile mispricing residuals within each (sport, parallel_tier)."""
+    """Top-decile mispricing residuals within each (sport, parallel_tier).
+
+    Excludes tier-D (illiquid) and is_hyped (bubble-top) names.
+    """
+    factor_df = _apply_liquidity_hype_filters(factor_df, drop_hyped=True)
     if factor_df.empty:
         return []
     group_cols = [c for c in ("sport", "parallel_tier") if c in factor_df.columns]
@@ -119,6 +138,9 @@ def _select_factor_long(factor_df: pd.DataFrame, decile: int) -> list[int]:
 
 
 def _select_factor_short(factor_df: pd.DataFrame, decile: int) -> list[int]:
+    # Shorts can include hyped names (those are the bubble-tops we want to fade);
+    # still exclude tier-D since we can't trade them.
+    factor_df = _apply_liquidity_hype_filters(factor_df, drop_hyped=False)
     if factor_df.empty:
         return []
     group_cols = [c for c in ("sport", "parallel_tier") if c in factor_df.columns]
@@ -131,6 +153,80 @@ def _select_factor_short(factor_df: pd.DataFrame, decile: int) -> list[int]:
         bot = grp.nsmallest(n, "mispricing_residual")
         selected.extend(bot["card_id"].tolist())
     return selected
+
+
+def _momentum_tilt(
+    card_ids: list[int],
+    factor_df: pd.DataFrame,
+    sleeve_weight: float,
+    per_name_cap: float,
+    sleeve_label: Sleeve,
+    aum: float,
+) -> tuple[list[TargetPosition], float]:
+    """Distribute ``sleeve_weight`` proportional to ``cs_momentum_pct``.
+
+    Falls back to equal-weight when momentum data is absent. Per-name cap
+    is enforced via the same iterative spillover loop as equal-weighting.
+    """
+    if not card_ids:
+        return [], sleeve_weight
+    if "cs_momentum_pct" not in factor_df.columns:
+        return _equal_weight_with_cap(
+            card_ids, sleeve_weight, per_name_cap, sleeve_label, aum
+        )
+    weights_map: dict[int, float] = {}
+    sub = factor_df[factor_df["card_id"].isin(card_ids)]
+    raw = (
+        sub.set_index("card_id")["cs_momentum_pct"]
+        .astype(float)
+        .reindex(card_ids)
+        .fillna(0.5)
+    )
+    if raw.sum() <= 0:
+        return _equal_weight_with_cap(
+            card_ids, sleeve_weight, per_name_cap, sleeve_label, aum
+        )
+
+    remaining = sleeve_weight
+    raw_arr = raw.to_numpy()
+    base_alloc = (raw_arr / raw_arr.sum()) * sleeve_weight
+    for cid, w in zip(card_ids, base_alloc, strict=True):
+        weights_map[cid] = min(float(w), per_name_cap)
+        remaining -= weights_map[cid]
+
+    # Spill any cap-cut weight to the under-cap names, proportional to their
+    # raw momentum score (not yet at cap).
+    while remaining > 1e-12:
+        eligible = [cid for cid in card_ids if weights_map[cid] < per_name_cap - 1e-12]
+        if not eligible:
+            break
+        elig_raw = np.array(
+            [float(raw[cid]) if raw[cid] > 0 else 1e-9 for cid in eligible]
+        )
+        total = elig_raw.sum()
+        progressed = False
+        for cid, r in zip(eligible, elig_raw, strict=True):
+            room = per_name_cap - weights_map[cid]
+            add = min(room, remaining * (r / total))
+            if add <= 0:
+                continue
+            weights_map[cid] += add
+            remaining -= add
+            progressed = True
+        if not progressed:
+            break
+
+    positions = [
+        TargetPosition(
+            card_id=cid,
+            sleeve=sleeve_label,
+            target_weight_pct=w,
+            target_usd_value=w * aum,
+        )
+        for cid, w in weights_map.items()
+        if w > 1e-12
+    ]
+    return positions, max(remaining, 0.0)
 
 
 _DEFAULT_ALLOC = AllocationConfig()
@@ -186,8 +282,13 @@ def build_portfolio(
             short_ids = []
             long_w = factor_w
             short_w = 0.0
-        lp, _ = _equal_weight_with_cap(
-            long_ids, long_w, cfg.other_position_cap_pct, "factor_long", aum
+        lp, _ = _momentum_tilt(
+            long_ids,
+            universe.factor_df,
+            long_w,
+            cfg.other_position_cap_pct,
+            "factor_long",
+            aum,
         )
         positions.extend(lp)
         if short_ids:

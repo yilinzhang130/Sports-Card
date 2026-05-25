@@ -27,8 +27,8 @@ from sqlalchemy.orm import Session
 
 from sportscards.db.models import TxMispricing
 
-MODEL_VERSION = "hedonic_v1"
-MODEL_PATH = Path("models/hedonic_v1.joblib")
+MODEL_VERSION = "hedonic_v2"
+MODEL_PATH = Path("models/hedonic_v2.joblib")
 
 
 # Order matters — `MONOTONE_CONSTRAINTS` is index-aligned with the
@@ -43,8 +43,11 @@ NUMERICAL_FEATURES: list[str] = [
     "player_age_at_sale",  #  0
     "years_since_draft",  #  0
     "draft_pick",  #  0 (lower pick = better player but signal is noisy)
+    "cs_momentum_pct",  # +1: stronger momentum → pricier
+    "log_sales_count_90d",  #  0 (illiquid premium is ambiguous)
+    "bid_ask_proxy",  #  0 (illiquid premium is ambiguous)
 ]
-NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0)
+NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, +1, 0, 0)
 
 BOOLEAN_FEATURES: list[str] = [
     "is_rookie",
@@ -52,10 +55,16 @@ BOOLEAN_FEATURES: list[str] = [
     "has_patch",
     "is_one_of_one",
     "era_modern",
+    "is_hyped",  # +1: hype premium (let model decide magnitude, but sign is up)
 ]
-BOOLEAN_MONOTONE: tuple[int, ...] = (0, 0, 0, 0, 0)
+BOOLEAN_MONOTONE: tuple[int, ...] = (0, 0, 0, 0, 0, +1)
 
-CATEGORICAL_FEATURES: list[str] = ["set_tier", "team_market", "slab_grader"]
+CATEGORICAL_FEATURES: list[str] = [
+    "set_tier",
+    "team_market",
+    "slab_grader",
+    "liquidity_tier",
+]
 
 
 def _build_design_matrix(
