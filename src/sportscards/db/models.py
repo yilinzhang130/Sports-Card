@@ -172,13 +172,9 @@ class ProspectForecast(Base):
     years_until_draft: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     prior_league: Mapped[str] = mapped_column(String(16), nullable=False, default="NCAA")
     n_games_played: Mapped[int | None] = mapped_column(Integer)
-    fit_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    fit_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    __table_args__ = (
-        Index("ix_prospect_forecast_draft_year", "draft_year", "as_of_date"),
-    )
+    __table_args__ = (Index("ix_prospect_forecast_draft_year", "draft_year", "as_of_date"),)
 
 
 class PopSnapshot(Base):

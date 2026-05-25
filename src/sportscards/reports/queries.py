@@ -99,9 +99,9 @@ def forward_prospects(
     eng = _engine(engine)
     _require(eng, "prospect_forecast", "Phase 3")
     if draft_year is None:
-        max_year = pd.read_sql(
-            text("SELECT MAX(draft_year) AS y FROM prospect_forecast"), eng
-        )["y"].iloc[0]
+        max_year = pd.read_sql(text("SELECT MAX(draft_year) AS y FROM prospect_forecast"), eng)[
+            "y"
+        ].iloc[0]
         if max_year is None:
             return pd.DataFrame()
         draft_year = int(max_year)
@@ -116,9 +116,7 @@ def forward_prospects(
         "  )"
     )
     df = pd.read_sql(sql, eng, params={"dy": draft_year})
-    return df.sort_values("premium", ascending=False, na_position="last").reset_index(
-        drop=True
-    )
+    return df.sort_values("premium", ascending=False, na_position="last").reset_index(drop=True)
 
 
 def player_price_history(player_id: int, engine: Engine | None = None) -> pd.DataFrame:

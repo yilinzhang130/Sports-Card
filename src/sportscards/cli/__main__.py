@@ -511,9 +511,7 @@ def scouting_refresh_mock_drafts_cmd(draft_year: int) -> None:
     default=None,
     help="Snapshot date; defaults to today.",
 )
-def scouting_score_class_cmd(
-    draft_year: int, season: str, as_of: datetime | None
-) -> None:
+def scouting_score_class_cmd(draft_year: int, season: str, as_of: datetime | None) -> None:
     """Forward-looking score for a draft class; writes ``prospect_forecast``."""
     from sportscards.db.session import session_scope
     from sportscards.scouting.nba.score_undrafted import score_current_class
@@ -555,15 +553,19 @@ def scouting_top_prospects_cmd(draft_year: int, limit: int) -> None:
                 f"run `sportscards scouting score-class --draft-year {draft_year}` first."
             )
             return
-        rows = s.execute(
-            select(ProspectForecast)
-            .where(ProspectForecast.draft_year == draft_year)
-            .where(ProspectForecast.model_version == MODEL_VERSION)
-            .where(ProspectForecast.as_of_date == latest_as_of)
-            .where(ProspectForecast.premium.is_not(None))
-            .order_by(ProspectForecast.premium.desc())
-            .limit(limit)
-        ).scalars().all()
+        rows = (
+            s.execute(
+                select(ProspectForecast)
+                .where(ProspectForecast.draft_year == draft_year)
+                .where(ProspectForecast.model_version == MODEL_VERSION)
+                .where(ProspectForecast.as_of_date == latest_as_of)
+                .where(ProspectForecast.premium.is_not(None))
+                .order_by(ProspectForecast.premium.desc())
+                .limit(limit)
+            )
+            .scalars()
+            .all()
+        )
 
     from rich.console import Console
     from rich.table import Table
@@ -581,8 +583,10 @@ def scouting_top_prospects_cmd(draft_year: int, limit: int) -> None:
         table.add_row(
             str(i),
             r.name,
-            "FR" if r.is_underclassman and r.years_until_draft == 2
-            else "SO" if r.is_underclassman
+            "FR"
+            if r.is_underclassman and r.years_until_draft == 2
+            else "SO"
+            if r.is_underclassman
             else "Upper",
             f"{float(r.premium):+.3f}" if r.premium is not None else "—",
             f"{float(r.pairwise_score):+.3f}" if r.pairwise_score is not None else "—",

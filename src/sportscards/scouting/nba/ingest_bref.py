@@ -48,9 +48,9 @@ OUTCOME_COLUMNS = ["br_slug", "career_bpm_5y", "career_ws_5y", "career_vorp_5y"]
 
 CURRENT_NCAA_COLUMNS = [
     *PROSPECT_COLUMNS,
-    "class_year",          # "FR" | "SO" | "JR" | "SR" (or "" if unknown)
+    "class_year",  # "FR" | "SO" | "JR" | "SR" (or "" if unknown)
     "n_games_played",
-    "prior_league",        # always "NCAA" for this ingestor
+    "prior_league",  # always "NCAA" for this ingestor
 ]
 
 # Years until the player is *expected* to declare for the draft, per the
@@ -263,9 +263,7 @@ def _normalize_current_ncaa(raw: pd.DataFrame, season: str) -> pd.DataFrame:
     if "br_slug" not in df.columns:
         df["br_slug"] = df.get("slug", df.get("name", pd.Series(dtype=str)))
     if "class_year" in df.columns:
-        df["class_year"] = (
-            df["class_year"].fillna("").astype(str).str.upper().str.strip()
-        )
+        df["class_year"] = df["class_year"].fillna("").astype(str).str.upper().str.strip()
     else:
         df["class_year"] = ""
     # Per-row draft_year derives from each player's class — NOT a constant.

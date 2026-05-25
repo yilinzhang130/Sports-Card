@@ -46,10 +46,21 @@ def _train_prism() -> object:
     prospects = pd.DataFrame(
         [
             {
-                "br_slug": r[0], "name": r[1], "draft_year": 2018, "draft_pick": r[2],
-                "position": r[3], "age_at_draft": r[4], "usg_pct": r[5], "ts_pct": r[6],
-                "trb_pct": r[7], "ast_pct": r[8], "stl_pct": r[9], "blk_pct": r[10],
-                "sos": r[11], "recruit_rank_pct": r[12], "wingspan_in": 80.0,
+                "br_slug": r[0],
+                "name": r[1],
+                "draft_year": 2018,
+                "draft_pick": r[2],
+                "position": r[3],
+                "age_at_draft": r[4],
+                "usg_pct": r[5],
+                "ts_pct": r[6],
+                "trb_pct": r[7],
+                "ast_pct": r[8],
+                "stl_pct": r[9],
+                "blk_pct": r[10],
+                "sos": r[11],
+                "recruit_rank_pct": r[12],
+                "wingspan_in": 80.0,
                 "max_vert_in": 36.0,
             }
             for r in TRAIN_SET
@@ -72,12 +83,12 @@ def trained_model() -> object:
 # we exercise the draft_year derivation path.
 NCAA_ROWS = [
     # (slug, name, class_year, pos, age, usg, ts, trb, ast, stl, blk, sos, recruit_pct, ngp)
-    ("elite_sr",  "Elite SR",  "SR", "PG", 22.0, 30.0, 0.62,  9.0, 25.0, 1.7, 0.6, 8.0, 0.85, 32),
-    ("solid_sr",  "Solid SR",  "SR", "SF", 22.0, 24.0, 0.58, 10.0,  5.0, 1.3, 0.9, 7.0, 0.70, 30),
-    ("hype_sr",   "Hyped SR",  "SR", "PF", 21.5, 28.0, 0.55, 12.0,  4.0, 0.9, 1.4, 7.5, 0.95, 28),
-    ("weak_sr",   "Weak SR",   "SR", "SG", 22.3, 22.0, 0.52,  5.0,  4.0, 1.0, 0.4, 5.0, 0.40, 31),
-    ("steady_sr", "Steady SR", "SR", "C",  22.1, 24.0, 0.61, 18.0,  2.0, 0.7, 3.8, 6.5, 0.60, 29),
-    ("freshman",  "True FR",   "FR", "PG", 18.5, 26.0, 0.58,  7.0,  6.0, 1.5, 0.5, 8.0, 0.90, 18),
+    ("elite_sr", "Elite SR", "SR", "PG", 22.0, 30.0, 0.62, 9.0, 25.0, 1.7, 0.6, 8.0, 0.85, 32),
+    ("solid_sr", "Solid SR", "SR", "SF", 22.0, 24.0, 0.58, 10.0, 5.0, 1.3, 0.9, 7.0, 0.70, 30),
+    ("hype_sr", "Hyped SR", "SR", "PF", 21.5, 28.0, 0.55, 12.0, 4.0, 0.9, 1.4, 7.5, 0.95, 28),
+    ("weak_sr", "Weak SR", "SR", "SG", 22.3, 22.0, 0.52, 5.0, 4.0, 1.0, 0.4, 5.0, 0.40, 31),
+    ("steady_sr", "Steady SR", "SR", "C", 22.1, 24.0, 0.61, 18.0, 2.0, 0.7, 3.8, 6.5, 0.60, 29),
+    ("freshman", "True FR", "FR", "PG", 18.5, 26.0, 0.58, 7.0, 6.0, 1.5, 0.5, 8.0, 0.90, 18),
 ]
 
 
@@ -86,13 +97,26 @@ def ncaa_season_parquet(tmp_path: Path) -> Path:
     """Write a synthetic ncaa_current_2025-26.parquet via the real ingest path."""
     rows = []
     for r in NCAA_ROWS:
-        rows.append({
-            "br_slug": r[0], "name": r[1], "class_year": r[2], "position": r[3],
-            "age_at_draft": r[4], "usg_pct": r[5], "ts_pct": r[6], "trb_pct": r[7],
-            "ast_pct": r[8], "stl_pct": r[9], "blk_pct": r[10], "sos": r[11],
-            "recruit_rank_pct": r[12], "n_games_played": r[13],
-            "wingspan_in": 80.0, "max_vert_in": 36.0,
-        })
+        rows.append(
+            {
+                "br_slug": r[0],
+                "name": r[1],
+                "class_year": r[2],
+                "position": r[3],
+                "age_at_draft": r[4],
+                "usg_pct": r[5],
+                "ts_pct": r[6],
+                "trb_pct": r[7],
+                "ast_pct": r[8],
+                "stl_pct": r[9],
+                "blk_pct": r[10],
+                "sos": r[11],
+                "recruit_rank_pct": r[12],
+                "n_games_played": r[13],
+                "wingspan_in": 80.0,
+                "max_vert_in": 36.0,
+            }
+        )
     raw = pd.DataFrame(rows)
 
     class FakeNCAA:
@@ -106,9 +130,7 @@ def ncaa_season_parquet(tmp_path: Path) -> Path:
         def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
             return pd.DataFrame()
 
-    return ingest_bref.ingest_current_ncaa_season(
-        "2025-26", client=FakeNCAA(), cache_dir=tmp_path
-    )
+    return ingest_bref.ingest_current_ncaa_season("2025-26", client=FakeNCAA(), cache_dir=tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -154,19 +176,30 @@ def mock_dir_2026(tmp_path: Path) -> Path:
         snap_date=snap,
         rankings_by_source={
             "espn": [
-                ("hype_sr", 1), ("ayton_recruit", 2), ("solid_sr", 8),
-                ("elite_sr", 22), ("steady_sr", 15),
+                ("hype_sr", 1),
+                ("ayton_recruit", 2),
+                ("solid_sr", 8),
+                ("elite_sr", 22),
+                ("steady_sr", 15),
             ],
             "tankathon": [
-                ("hype_sr", 2), ("solid_sr", 9), ("elite_sr", 25),
-                ("steady_sr", 18), ("weak_sr", 45),
+                ("hype_sr", 2),
+                ("solid_sr", 9),
+                ("elite_sr", 25),
+                ("steady_sr", 18),
+                ("weak_sr", 45),
             ],
             "nbadraft_net": [
-                ("hype_sr", 3), ("solid_sr", 7), ("elite_sr", 28),
-                ("steady_sr", 12), ("weak_sr", 40),
+                ("hype_sr", 3),
+                ("solid_sr", 7),
+                ("elite_sr", 28),
+                ("steady_sr", 12),
+                ("weak_sr", 40),
             ],
             "the_ringer": [
-                ("hype_sr", 4), ("solid_sr", 10), ("elite_sr", 24),
+                ("hype_sr", 4),
+                ("solid_sr", 10),
+                ("elite_sr", 24),
                 ("steady_sr", 16),
                 # Only-2-source player: should be dropped by the consensus aggregator.
                 ("only_two_sources", 50),
@@ -174,14 +207,18 @@ def mock_dir_2026(tmp_path: Path) -> Path:
         },
     )
     # A second source for the dropout player so it has 2 < 3 sources total.
-    df = pd.DataFrame([{
-        "source": "espn",
-        "draft_year": 2026,
-        "fetched_at": pd.Timestamp.now(tz="UTC"),
-        "rank": 55,
-        "player_name": "Only Two Sources",
-        "br_slug": "only_two_sources",
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "source": "espn",
+                "draft_year": 2026,
+                "fetched_at": pd.Timestamp.now(tz="UTC"),
+                "rank": 55,
+                "player_name": "Only Two Sources",
+                "br_slug": "only_two_sources",
+            }
+        ]
+    )
     df = mock_draft._normalize_mock_frame(df, source="espn", draft_year=2026)
     df.to_parquet(mock_dir / f"espn_2026_{snap.isoformat()}_extra.parquet", index=False)
     return mock_dir
@@ -198,9 +235,7 @@ def test_iqr_and_median_math() -> None:
 
 
 def test_aggregate_consensus_drops_under_min_sources(mock_dir_2026: Path) -> None:
-    df = mock_draft.aggregate_consensus_rank(
-        2026, date(2026, 5, 1), cache_dir=mock_dir_2026
-    )
+    df = mock_draft.aggregate_consensus_rank(2026, date(2026, 5, 1), cache_dir=mock_dir_2026)
     slugs = set(df["br_slug"])
     assert "only_two_sources" not in slugs  # fewer than MIN_SOURCES_FOR_CONSENSUS
     assert "hype_sr" in slugs and "elite_sr" in slugs
@@ -251,8 +286,7 @@ def test_undervalued_planted_prospect_gets_positive_premium(
     elite = df.loc[df["br_slug"] == "elite_sr"].iloc[0]
     assert pd.notna(elite["premium"]), "elite_sr should have a consensus rank"
     assert elite["premium"] > 0, (
-        f"expected positive premium for elite producer ranked ~25, "
-        f"got {elite['premium']:.3f}"
+        f"expected positive premium for elite producer ranked ~25, got {elite['premium']:.3f}"
     )
 
 
@@ -271,8 +305,7 @@ def test_overvalued_planted_prospect_gets_negative_premium(
     hyped = df.loc[df["br_slug"] == "hype_sr"].iloc[0]
     assert pd.notna(hyped["premium"])
     assert hyped["premium"] < 0, (
-        f"expected negative premium for over-hyped weak producer at #1, "
-        f"got {hyped['premium']:.3f}"
+        f"expected negative premium for over-hyped weak producer at #1, got {hyped['premium']:.3f}"
     )
 
 
@@ -312,14 +345,20 @@ def test_history_preserved_across_as_of_dates(
         draft_year=2026,
         snap_date=later,
         rankings_by_source={
-            "espn": [("hype_sr", 1), ("solid_sr", 5), ("elite_sr", 20),
-                      ("steady_sr", 12), ("weak_sr", 38)],
+            "espn": [
+                ("hype_sr", 1),
+                ("solid_sr", 5),
+                ("elite_sr", 20),
+                ("steady_sr", 12),
+                ("weak_sr", 38),
+            ],
         },
     )
 
     with Session(engine) as s:
         score_current_class(
-            draft_year=2026, season="2025-26",
+            draft_year=2026,
+            season="2025-26",
             as_of=date(2026, 5, 1),
             cache_dir=ncaa_season_parquet.parent,
             mock_draft_dir=mock_dir_2026,
@@ -328,7 +367,8 @@ def test_history_preserved_across_as_of_dates(
         )
         s.commit()
         score_current_class(
-            draft_year=2026, season="2025-26",
+            draft_year=2026,
+            season="2025-26",
             as_of=later,
             cache_dir=ncaa_season_parquet.parent,
             mock_draft_dir=mock_dir_2026,
@@ -355,14 +395,17 @@ def test_consensus_dropout_propagates_to_nan_premium(
             "tankathon": [("elite_sr", 7), ("hype_sr", 2), ("solid_sr", 9)],
             # weak_sr only here (2 sources after merging with tankathon).
             "nbadraft_net": [
-                ("elite_sr", 6), ("hype_sr", 3), ("solid_sr", 10),
+                ("elite_sr", 6),
+                ("hype_sr", 3),
+                ("solid_sr", 10),
                 ("weak_sr", 40),
             ],
             "the_ringer": [("weak_sr", 38)],  # weak_sr's 2nd source only
         },
     )
     df = score_current_class(
-        draft_year=2026, season="2025-26",
+        draft_year=2026,
+        season="2025-26",
         as_of=date(2026, 5, 1),
         cache_dir=ncaa_season_parquet.parent,
         mock_draft_dir=mock_dir,
@@ -389,7 +432,8 @@ def test_persist_handles_nan_premium_cleanly(
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         df = score_current_class(
-            draft_year=2026, season="2025-26",
+            draft_year=2026,
+            season="2025-26",
             as_of=date(2026, 5, 1),
             cache_dir=ncaa_season_parquet.parent,
             mock_draft_dir=mock_dir,
@@ -416,11 +460,11 @@ def test_ingest_current_ncaa_normalisation(tmp_path: Path) -> None:
 
     class Sparse:
         def get_current_ncaa_season(self, season: str) -> pd.DataFrame:
-            return pd.DataFrame(
-                [{"br_slug": "x", "name": "X", "class_year": "FR"}]
-            )
+            return pd.DataFrame([{"br_slug": "x", "name": "X", "class_year": "FR"}])
 
-        def get_draft_class(self, year: int) -> pd.DataFrame: return pd.DataFrame()
+        def get_draft_class(self, year: int) -> pd.DataFrame:
+            return pd.DataFrame()
+
         def get_player_career_advanced(self, n: str, max_seasons: int = 5) -> pd.DataFrame:
             return pd.DataFrame()
 
