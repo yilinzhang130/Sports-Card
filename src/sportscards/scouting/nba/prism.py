@@ -2,6 +2,35 @@
 
 Pairwise framing avoids the "regress-to-the-training-mean" failure of
 absolute-target gradient boosting on long-tail outcomes (Luka, Jokic).
+
+Feature inventory (built by ``features.build_feature_matrix``):
+
+NCAA production:
+    trb_pct, ast_pct, stl_pct, blk_pct, usg_pct, ts_pct, sos,
+    recruit_rank_pct, age_at_draft
+
+Draft signal:
+    draft_pick, log_draft_pick, mock_rank
+
+Legacy anthropometric (from BR draft page):
+    wingspan_in, max_vert_in
+
+Position one-hots:
+    pos_PG, pos_SG, pos_SF, pos_PF, pos_C
+
+NBA Combine measurements (optional, joined by ``features.merge_combine``):
+    wingspan_minus_height — ape index, wingspan minus barefoot+shoe height;
+        the single most predictive combine measurement for forwards/wings
+    bmi — body mass index from combine height/weight
+    standing_reach — strong frontcourt-projection signal
+    max_vertical — explosiveness proxy
+    lane_agility_time — guard lateral-quickness signal (lower is better)
+    three_quarter_sprint — guard straight-line speed (lower is better)
+    has_combine_data — flag, 1 iff any combine column was non-null pre-imputation
+    combine_<feature>_imputed — per-feature flag, 1 iff value was median-imputed
+
+The combine block is skipped if no cache is present, so the model degrades
+gracefully to the NCAA-only feature set used in PRISM v1.
 """
 
 from __future__ import annotations
