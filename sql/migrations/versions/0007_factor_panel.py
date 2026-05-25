@@ -1,8 +1,11 @@
 """factor_panel table for momentum + liquidity factors
 
-Revision ID: 0006
-Revises: 0005
+Revision ID: 0007
+Revises: 0006
 Create Date: 2026-05-25
+
+Chained after 0006_prospect_forecast which landed on main while this
+branch was open.
 """
 
 from collections.abc import Sequence
@@ -10,8 +13,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0006"
-down_revision: str | None = "0005"
+revision: str = "0007"
+down_revision: str | None = "0006"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

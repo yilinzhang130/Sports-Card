@@ -27,8 +27,8 @@ from sqlalchemy.orm import Session
 
 from sportscards.db.models import TxMispricing
 
-MODEL_VERSION = "hedonic_v2"
-MODEL_PATH = Path("models/hedonic_v2.joblib")
+MODEL_VERSION = "hedonic_v3"
+MODEL_PATH = Path("models/hedonic_v3.joblib")
 
 
 # Order matters — `MONOTONE_CONSTRAINTS` is index-aligned with the
@@ -46,8 +46,10 @@ NUMERICAL_FEATURES: list[str] = [
     "cs_momentum_pct",  # +1: stronger momentum → pricier
     "log_sales_count_90d",  #  0 (illiquid premium is ambiguous)
     "bid_ask_proxy",  #  0 (illiquid premium is ambiguous)
+    "stardom_premium",  # +1: more stardom → higher price
+    "stardom_premium_x_is_rookie",  # +1: amplified for rookies
 ]
-NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, +1, 0, 0)
+NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, +1, 0, 0, +1, +1)
 
 BOOLEAN_FEATURES: list[str] = [
     "is_rookie",
@@ -56,8 +58,9 @@ BOOLEAN_FEATURES: list[str] = [
     "is_one_of_one",
     "era_modern",
     "is_hyped",  # +1: hype premium (let model decide magnitude, but sign is up)
+    "has_stardom_score",
 ]
-BOOLEAN_MONOTONE: tuple[int, ...] = (0, 0, 0, 0, 0, +1)
+BOOLEAN_MONOTONE: tuple[int, ...] = (0, 0, 0, 0, 0, +1, 0)
 
 CATEGORICAL_FEATURES: list[str] = [
     "set_tier",

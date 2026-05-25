@@ -46,6 +46,48 @@ PROSPECT_COLUMNS = [
 
 OUTCOME_COLUMNS = ["br_slug", "career_bpm_5y", "career_ws_5y", "career_vorp_5y"]
 
+CURRENT_NCAA_COLUMNS = [
+    *PROSPECT_COLUMNS,
+    "class_year",  # "FR" | "SO" | "JR" | "SR" (or "" if unknown)
+    "n_games_played",
+    "prior_league",  # always "NCAA" for this ingestor
+]
+
+# Years until the player is *expected* to declare for the draft, per the
+# scouting spec: FR=2, SO=1, JR=0/1, SR=0. Used to mark forward optionality;
+# this is metadata only and is NOT fed to the model.
+CLASS_TO_YEARS_UNTIL_DRAFT: dict[str, int] = {
+    "FR": 2,
+    "SO": 1,
+    "JR": 0,
+    "SR": 0,
+    "": 0,
+}
+UNDERCLASSMEN: set[str] = {"FR", "SO"}
+
+
+def expected_draft_year(season: str, class_year: str) -> int:
+    """Given a season label like "2025-26" and a class year, return the
+    draft year the player is expected to enter.
+
+    A true freshman in 2025-26 (FR) would, under our convention, declare
+    after 2 more seasons → 2028 draft. A senior declares this year → 2026.
+    """
+    end_year = _season_end_year(season)
+    return end_year + CLASS_TO_YEARS_UNTIL_DRAFT.get(class_year.upper(), 0)
+
+
+def _season_end_year(season: str) -> int:
+    """'2025-26' -> 2026. '2099-00' wraps centuries correctly."""
+    start_str, end_str = season.split("-")
+    start = int(start_str)
+    end_suffix = int(end_str)
+    century = (start // 100) * 100
+    end = century + end_suffix
+    if end < start:
+        end += 100
+    return end
+
 
 class BRefClient(Protocol):
     """Narrow protocol — only what the ingester needs.
@@ -68,6 +110,17 @@ class BRefClient(Protocol):
         player (looked up by player NAME — Basketball-Reference's scraper API
         does not accept BR slugs), with at least ``BPM``, ``WS``, ``VORP``
         columns.
+        """
+        ...
+
+    def get_current_ncaa_season(self, season: str) -> pd.DataFrame:
+        """Return one row per current-season D-I player with the prospect
+        columns (``br_slug``, ``name``, ``position``, ``age_at_draft``,
+        per-100 advanced rates, ``sos``, ``recruit_rank_pct``) plus
+        ``class_year`` ∈ {FR, SO, JR, SR} and ``n_games_played``.
+
+        Forward-looking: ``draft_pick`` will not be present and is added by
+        the ingester. ``season`` is in BR's "2025-26" form.
         """
         ...
 
@@ -98,6 +151,20 @@ class LiveBRefClient:
             df["draft_pick"] = pd.to_numeric(df["pk"], errors="coerce")
         df["draft_year"] = year
         return cast(pd.DataFrame, df)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
+    def get_current_ncaa_season(self, season: str) -> pd.DataFrame:
+        """Production current-season ingest is not wired against any concrete
+        upstream source yet — the `basketball_reference_scraper` library does
+        not expose D-I per-100 stats. Live usage requires a custom HTML
+        scraper or sports-reference paid API; for now the live path raises
+        so tests must inject a fake client.
+        """
+        raise RuntimeError(
+            "LiveBRefClient.get_current_ncaa_season is not implemented; inject a "
+            "concrete client for the desired upstream source (sports-reference, "
+            "Bart Torvik, KenPom) or pre-stage a parquet under data/scouting_cache/."
+        )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
     def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
@@ -156,6 +223,62 @@ def ingest_year(
     logger.info("wrote %d outcomes → %s", len(outcomes_df), outcomes_path)
 
     return prospects_path, outcomes_path
+
+
+def ingest_current_ncaa_season(
+    season: str,
+    client: BRefClient,
+    cache_dir: Path = CACHE_DIR,
+) -> Path:
+    """Pull every D-I player's current-season stats and write one parquet.
+
+    Forward-looking analogue of ``ingest_year``. Unlike the historical path,
+    ``draft_pick`` does not yet exist for these players — the column is
+    populated as NA and ``score_undrafted.score_current_class`` injects
+    ``UNDRAFTED_SENTINEL`` at feature-build time.
+
+    Output columns: ``CURRENT_NCAA_COLUMNS`` (the 16 prospect fields plus
+    ``class_year``, ``n_games_played``, ``prior_league``). Each row's
+    ``draft_year`` is the player's *expected* declaration year derived from
+    ``class_year`` per ``CLASS_TO_YEARS_UNTIL_DRAFT``.
+
+    Cache: ``data/scouting_cache/ncaa_current_{season}.parquet``.
+    """
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    raw = client.get_current_ncaa_season(season)
+    df = _normalize_current_ncaa(raw, season)
+    out = cache_dir / f"ncaa_current_{season}.parquet"
+    df.to_parquet(out, index=False)
+    logger.info("wrote %d NCAA current-season rows → %s", len(df), out)
+    return out
+
+
+def load_current_ncaa(season: str, cache_dir: Path = CACHE_DIR) -> pd.DataFrame:
+    """Read the parquet cached by ``ingest_current_ncaa_season``."""
+    return pd.read_parquet(cache_dir / f"ncaa_current_{season}.parquet")
+
+
+def _normalize_current_ncaa(raw: pd.DataFrame, season: str) -> pd.DataFrame:
+    df = raw.copy()
+    if "br_slug" not in df.columns:
+        df["br_slug"] = df.get("slug", df.get("name", pd.Series(dtype=str)))
+    if "class_year" in df.columns:
+        df["class_year"] = df["class_year"].fillna("").astype(str).str.upper().str.strip()
+    else:
+        df["class_year"] = ""
+    # Per-row draft_year derives from each player's class — NOT a constant.
+    df["draft_year"] = df["class_year"].apply(lambda c: expected_draft_year(season, c))
+    if "prior_league" not in df.columns:
+        df["prior_league"] = "NCAA"
+    if "n_games_played" not in df.columns:
+        df["n_games_played"] = pd.NA
+    # draft_pick is unknown for current-season prospects.
+    if "draft_pick" not in df.columns:
+        df["draft_pick"] = pd.NA
+    for col in CURRENT_NCAA_COLUMNS:
+        if col not in df.columns:
+            df[col] = pd.NA
+    return df[CURRENT_NCAA_COLUMNS].copy()
 
 
 def load_cohort(years: range, cache_dir: Path = CACHE_DIR) -> tuple[pd.DataFrame, pd.DataFrame]:

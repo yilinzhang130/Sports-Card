@@ -16,7 +16,14 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Card, FactorPanel, Player, PopSnapshot, TxClean
+from sportscards.db.models import (
+    Card,
+    FactorPanel,
+    Player,
+    PlayerStardomScore,
+    PopSnapshot,
+    TxClean,
+)
 
 # ---------------------------------------------------------------------------
 # Per-card categorical helpers
@@ -122,6 +129,7 @@ def build_features(session: Session) -> pd.DataFrame:
             Card.has_patch,
             Card.is_one_of_one,
             Card.set_name,
+            Player.player_id,
             Player.dob,
             Player.draft_year,
             Player.draft_pick,
@@ -302,15 +310,56 @@ def build_features(session: Session) -> pd.DataFrame:
     df["bid_ask_proxy"] = pd.to_numeric(df["bid_ask_proxy"], errors="coerce").fillna(0.0)
     df["sales_count_90d"] = pd.to_numeric(df["sales_count_90d"], errors="coerce").fillna(0.0)
     df["log_sales_count_90d"] = np.log1p(df["sales_count_90d"].astype(float))
-    # is_hyped → bool → int
     df["is_hyped"] = df["is_hyped"].fillna(False).astype(bool).astype(int)
-    # liquidity_tier as canonical str — default D when missing
     df["liquidity_tier"] = df["liquidity_tier"].fillna("D").astype(str)
+
+    # --- Stardom premium (Phase 3 → Phase 2B integration) ---
+    score_rows = session.execute(
+        select(
+            PlayerStardomScore.player_id,
+            PlayerStardomScore.premium,
+            PlayerStardomScore.fit_at,
+        )
+    ).all()
+    scores = pd.DataFrame(score_rows, columns=["player_id", "premium", "fit_at"])
+
+    if scores.empty:
+        df["stardom_premium"] = np.nan
+        df["has_stardom_score"] = False
+    else:
+        scores["fit_at"] = _to_naive(scores["fit_at"])
+        scores["premium"] = scores["premium"].astype(float)
+        scores = scores.sort_values("fit_at")
+        df = df.sort_values("sold_at").reset_index(drop=True)
+        df = pd.merge_asof(
+            df,
+            scores,
+            left_on="sold_at",
+            right_on="fit_at",
+            by="player_id",
+            direction="backward",
+        )
+        df["has_stardom_score"] = df["premium"].notna()
+        df = df.rename(columns={"premium": "stardom_premium"})
+        df = df.drop(columns=["fit_at"])
+
+    # Fill missing premium with modern-rookie cohort median, else 0.
+    cohort_mask = (df.get("is_rookie", 0) == 1) & (df.get("era_modern", 0) == 1)
+    cohort_median = (
+        df.loc[cohort_mask, "stardom_premium"].dropna().astype(float).median()
+        if cohort_mask.any()
+        else 0.0
+    )
+    if pd.isna(cohort_median):
+        cohort_median = 0.0
+    df["stardom_premium"] = df["stardom_premium"].astype(float).fillna(cohort_median)
+    df["stardom_premium_x_is_rookie"] = df["stardom_premium"] * df["is_rookie"].astype(float)
 
     out_cols = [
         # identifiers
         "tx_id",
         "sold_at",
+        "player_id",
         # target
         "log_price",
         # numerical
@@ -338,5 +387,8 @@ def build_features(session: Session) -> pd.DataFrame:
         "team_market",
         "slab_grader",
         "liquidity_tier",
+        "stardom_premium",
+        "has_stardom_score",
+        "stardom_premium_x_is_rookie",
     ]
     return df[out_cols].reset_index(drop=True)
