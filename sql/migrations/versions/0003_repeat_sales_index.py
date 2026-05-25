@@ -6,6 +6,7 @@ Create Date: 2026-05-24
 
 """
 
+import contextlib
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -34,9 +35,12 @@ def upgrade() -> None:
         "repeat_sales_index",
         ["sport", "grade_tier", "era", "bucket"],
     )
-    op.execute(
-        "SELECT create_hypertable('repeat_sales_index', 'period_start', if_not_exists => TRUE)"
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        with contextlib.suppress(Exception):
+            op.execute(
+                "SELECT create_hypertable('repeat_sales_index', 'period_start', if_not_exists => TRUE)"
+            )
 
 
 def downgrade() -> None:

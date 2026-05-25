@@ -246,3 +246,75 @@ class RepeatSalesIndex(Base):
     se: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
 
     __table_args__ = (Index("ix_rsi_lookup", "sport", "grade_tier", "era", "bucket"),)
+
+
+class PortfolioOverride(Base):
+    """Trader-Console manual weight overrides per card."""
+
+    __tablename__ = "portfolio_overrides"
+
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), primary_key=True)
+    target_weight_pct: Mapped[Decimal] = mapped_column(Numeric(8, 5), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    set_by: Mapped[str] = mapped_column(String(64), nullable=False, server_default="ui")
+    set_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PortfolioHolding(Base):
+    """Physical slab holdings tracked by the Trader Console."""
+
+    __tablename__ = "portfolio_holdings"
+
+    holding_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), nullable=False)
+    cert_number: Mapped[str | None] = mapped_column(String(32))
+    slab_grader: Mapped[str | None] = mapped_column(String(16))
+    slab_grade: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    acquired_cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="held")
+    sold_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sold_proceeds_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+
+    __table_args__ = (
+        Index("ix_holdings_card", "card_id"),
+        Index("ix_holdings_status", "status"),
+    )
+
+
+class ModelRunLog(Base):
+    """Log of model/pipeline runs triggered from the Trader Console."""
+
+    __tablename__ = "model_run_log"
+
+    run_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    params_json: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, server_default="{}"
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="running")
+    summary_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    error: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (Index("ix_runlog_action_status", "action", "status"),)
+
+
+class AuditLog(Base):
+    """Immutable audit trail for all write actions in the Trader Console."""
+
+    __tablename__ = "audit_log"
+
+    audit_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    actor: Mapped[str] = mapped_column(String(64), nullable=False)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
