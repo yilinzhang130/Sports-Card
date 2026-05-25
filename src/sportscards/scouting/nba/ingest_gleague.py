@@ -15,7 +15,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -98,7 +98,7 @@ class LiveGLeagueClient:
         adv = _first_stats_table(adv_html)
         merged = _merge_per_game_and_advanced(per_game, adv)
         merged["season"] = season
-        return cast(pd.DataFrame, merged)
+        return merged
 
 
 class FakeGLeagueClient:

@@ -151,7 +151,7 @@ def _gleague_to_prospects(raw: pd.DataFrame, years: range) -> pd.DataFrame:
     df = df[df["draft_year"].isin(list(years))]
     df["prospect_origin"] = ORIGIN_GLEAGUE
     df["years_in_prior_league"] = 1
-    df["age_at_draft"] = pd.to_numeric(df.get("age"), errors="coerce")
+    df["age_at_draft"] = pd.to_numeric(df["age"], errors="coerce") if "age" in df.columns else pd.NA
     # G-League volume columns aren't directly used; map percent stats over.
     return _to_unified(df)
 
@@ -164,7 +164,7 @@ def _euro_to_prospects(raw: pd.DataFrame, years: range) -> pd.DataFrame:
     df = df[df["draft_year"].isin(list(years))]
     df["prospect_origin"] = df["league"].map(LEAGUE_ORIGIN).fillna("OTHER_INTL").astype(str)
     df["years_in_prior_league"] = 1
-    df["age_at_draft"] = pd.to_numeric(df.get("age"), errors="coerce")
+    df["age_at_draft"] = pd.to_numeric(df["age"], errors="coerce") if "age" in df.columns else pd.NA
     return _to_unified(df)
 
 
@@ -242,7 +242,7 @@ def _season_to_draft_year(season: object) -> int | float:
     """'2017-18' → 2018 (the draft happens in June after the season ends)."""
     if not isinstance(season, str) or "-" not in season:
         try:
-            return int(season)  # type: ignore[arg-type]
+            return int(season)  # type: ignore[call-overload, no-any-return]
         except (TypeError, ValueError):
             return float("nan")
     start, end = season.split("-", 1)

@@ -17,7 +17,7 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -105,7 +105,7 @@ class LiveEuroClient:
             if not df.empty:
                 df["league"] = league
                 df["season"] = season
-                return cast(pd.DataFrame, df)
+                return df
         except Exception as e:  # noqa: BLE001 - want to fall back on any failure
             logger.warning("realgm fetch failed for %s/%s: %s", league, season, e)
 
@@ -116,7 +116,7 @@ class LiveEuroClient:
         df = _parse_proballers(html)
         df["league"] = league
         df["season"] = season
-        return cast(pd.DataFrame, df)
+        return df
 
 
 class FakeEuroClient:
