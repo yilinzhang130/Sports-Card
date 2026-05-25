@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from sportscards.db.models import Base, Player, PlayerEvent, PlayerEventType
 from sportscards.events import awards, injuries, schedule, transactions
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

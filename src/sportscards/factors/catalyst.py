@@ -18,8 +18,7 @@ half-lives for the default 30-day rate, so the bias is small. Bump
 
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -70,9 +69,9 @@ def _as_datetime_utc(as_of: date | datetime) -> datetime:
     """Normalize ``date`` to end-of-day UTC; pass datetimes through (assume UTC if naive)."""
     if isinstance(as_of, datetime):
         if as_of.tzinfo is None:
-            return as_of.replace(tzinfo=timezone.utc)
+            return as_of.replace(tzinfo=UTC)
         return as_of
-    return datetime.combine(as_of, time.max, tzinfo=timezone.utc)
+    return datetime.combine(as_of, time.max, tzinfo=UTC)
 
 
 def _injury_out_weight(payload: dict[str, Any] | None, base: Decimal) -> Decimal:
@@ -196,7 +195,7 @@ def compute_catalyst_scores_bulk(
     totals: dict[int, Decimal] = {pid: Decimal("0") for pid in player_ids}
     for pid, ev_type, ev_date, payload in session.execute(stmt).all():
         if ev_date.tzinfo is None:
-            ev_date = ev_date.replace(tzinfo=timezone.utc)
+            ev_date = ev_date.replace(tzinfo=UTC)
         age_days = (as_of_dt - ev_date).total_seconds() / 86400.0
         if age_days < 0:
             # Defensive: filter above should preclude this.

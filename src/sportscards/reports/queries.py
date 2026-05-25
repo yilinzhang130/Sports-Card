@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
 import pandas as pd
@@ -159,7 +159,7 @@ def recent_events(
     """
     eng = _engine(engine)
     _require(eng, "player_events", "Phase 5 catalyst")
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     sql = text(
         "SELECT e.event_date, p.name AS player_name, e.event_type, e.event_payload "
         "FROM player_events e "
@@ -182,8 +182,8 @@ def top_catalysts(
 
     eng = _engine(engine)
     _require(eng, "player_events", "Phase 5 catalyst")
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    as_of = datetime.now(timezone.utc)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    as_of = datetime.now(UTC)
 
     with Session(eng) as session:
         pid_rows = session.execute(
@@ -238,7 +238,7 @@ def player_catalyst_sparkline(
     eng = _engine(engine)
     _require(eng, "player_events", "Phase 5 catalyst")
 
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     start = today - timedelta(days=days)
     rows: list[dict[str, object]] = []
     with Session(eng) as session:

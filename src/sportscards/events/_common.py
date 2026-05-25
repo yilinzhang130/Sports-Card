@@ -81,10 +81,7 @@ def write_json_cache(
     pre-refactor on-disk shape used by tests and existing scripts).
     ``cache_dir=None`` falls back to ``data/events_cache/<source>/``.
     """
-    if cache_dir is None:
-        target_dir = DEFAULT_CACHE_ROOT / source
-    else:
-        target_dir = Path(cache_dir)
+    target_dir = DEFAULT_CACHE_ROOT / source if cache_dir is None else Path(cache_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     stem = as_of.isoformat() if isinstance(as_of, date) else str(as_of)

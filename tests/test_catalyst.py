@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -15,7 +15,6 @@ from sportscards.factors.catalyst import (
     compute_catalyst_score,
     compute_catalyst_scores_bulk,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -60,7 +59,7 @@ def _add_event(
     sess.flush()
 
 
-DAY0 = datetime(2024, 6, 1, 12, 0, tzinfo=timezone.utc)
+DAY0 = datetime(2024, 6, 1, 12, 0, tzinfo=UTC)
 
 
 def _pid(sess: Session, idx: int = 0) -> int:
@@ -79,10 +78,10 @@ def test_empty_returns_zero(session: Session) -> None:
 
 def test_as_of_safety(session: Session) -> None:
     pid = _pid(session)
-    _add_event(session, pid, "mvp", datetime(2024, 4, 1, tzinfo=timezone.utc))
+    _add_event(session, pid, "mvp", datetime(2024, 4, 1, tzinfo=UTC))
     session.commit()
     score = compute_catalyst_score(
-        session, pid, datetime(2024, 3, 31, tzinfo=timezone.utc)
+        session, pid, datetime(2024, 3, 31, tzinfo=UTC)
     )
     assert score == Decimal("0")
 

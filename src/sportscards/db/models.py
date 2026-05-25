@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
@@ -202,7 +202,7 @@ class TxMispricing(Base):
     __table_args__ = (Index("ix_tx_mispricing_residual", "residual"),)
 
 
-class PlayerEventType(str, Enum):
+class PlayerEventType(StrEnum):
     """Allowed `event_type` values for `player_events`.
 
     Validated in application code, not enforced at the DB level (the column is a

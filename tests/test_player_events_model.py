@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import create_engine
@@ -30,7 +30,7 @@ def _make_player(sess: Session) -> int:
 
 def test_player_event_roundtrip(session: Session) -> None:
     pid = _make_player(session)
-    event_date = datetime(2026, 4, 15, 19, 30, tzinfo=timezone.utc)
+    event_date = datetime(2026, 4, 15, 19, 30, tzinfo=UTC)
     session.add(
         PlayerEvent(
             player_id=pid,
@@ -45,7 +45,7 @@ def test_player_event_roundtrip(session: Session) -> None:
     assert fetched.player_id == pid
     assert fetched.event_type == "mvp"
     # SQLite strips tzinfo; compare naive components.
-    assert fetched.event_date.replace(tzinfo=timezone.utc) == event_date
+    assert fetched.event_date.replace(tzinfo=UTC) == event_date
     assert fetched.event_payload == {"season": "2025-26", "votes": 95.4}
     assert fetched.ingested_at is not None
     assert fetched.event_id is not None
@@ -64,7 +64,7 @@ def test_player_event_type_enum_values() -> None:
 
 def test_player_event_dedupe_unique_constraint(session: Session) -> None:
     pid = _make_player(session)
-    event_date = datetime(2026, 1, 10, tzinfo=timezone.utc)
+    event_date = datetime(2026, 1, 10, tzinfo=UTC)
     session.add(
         PlayerEvent(
             player_id=pid,

@@ -11,14 +11,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import Base, Player
-from sportscards.events import injuries, schedule, transactions
 from sportscards.events.awards import AwardRow
 from sportscards.events.injuries import InjuryRow
 from sportscards.events.schedule import GameRow
 from sportscards.events.transactions import TxnRow
 from sportscards.flows import daily_events as flow_mod
 from sportscards.flows.daily_events import _current_season, daily_events_flow
-
 
 # ---------------------------------------------------------------------------
 # _current_season

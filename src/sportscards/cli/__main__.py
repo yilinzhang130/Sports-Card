@@ -849,7 +849,8 @@ def events_refresh_awards_cmd(season: str | None) -> None:
 @click.option("--since-days", default=7, type=int)
 def events_refresh_transactions_cmd(since_days: int) -> None:
     """Pull recent NBA transactions and write call-up/two-way events."""
-    from datetime import date as _date, timedelta as _td
+    from datetime import date as _date
+    from datetime import timedelta as _td
 
     from sportscards.db.session import session_scope
     from sportscards.events.transactions import LiveTransactionsClient, ingest_transactions

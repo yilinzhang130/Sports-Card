@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import sys
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -83,7 +84,7 @@ def test_render_monthly_letter_is_idempotent(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def catalyst_engine():
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
@@ -92,7 +93,7 @@ def catalyst_engine():
 
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with Session(engine) as sess:
         players = [
             Player(name="Alpha", br_slug="alpha"),
