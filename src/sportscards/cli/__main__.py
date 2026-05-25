@@ -650,11 +650,18 @@ def ev() -> None:
 @click.option("--grade-tier", default="value_bulk")
 @click.option("--apply-trend-adjustment", is_flag=True, default=False)
 def ev_compute_cmd(as_of: str | None, grade_tier: str, apply_trend_adjustment: bool) -> None:
+    from datetime import datetime, timezone
+
     from sportscards.flows.daily_grading_ev import daily_grading_ev_flow
 
+    parsed_as_of = None
+    if as_of is not None:
+        dt = datetime.fromisoformat(as_of)
+        parsed_as_of = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     n = daily_grading_ev_flow(
         grade_tier=grade_tier,
         apply_trend_adjustment=apply_trend_adjustment,
+        as_of=parsed_as_of,
     )
     click.echo(f"wrote {n} grading_ev rows")
 

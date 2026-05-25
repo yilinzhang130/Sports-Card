@@ -17,9 +17,11 @@ from sportscards.factors.grading_ev import compute_grading_ev
 def daily_grading_ev_flow(
     grade_tier: str = "value_bulk",
     apply_trend_adjustment: bool = False,
+    as_of: datetime | None = None,
 ) -> int:
     log = get_run_logger()
-    as_of = datetime.now(tz=timezone.utc)
+    if as_of is None:
+        as_of = datetime.now(tz=timezone.utc)
     written = 0
     with session_scope() as s:
         cand_ids = s.execute(
@@ -44,7 +46,7 @@ def daily_grading_ev_flow(
                     gem_rate=ev.gem_rate, p10_price=ev.p10_price, p9_price=ev.p9_price,
                     cost_to_grade=ev.cost_to_grade, raw_price=ev.raw_price,
                     ev=ev.ev, ev_per_dollar=ev.ev_per_dollar,
-                    sample_size=ev.sample_size,
+                    sample_size=ev.sample_size, p10_pop=ev.p10_pop,
                 )
                 .on_conflict_do_update(
                     index_elements=["card_id", "as_of_date", "grade_tier"],
@@ -53,7 +55,7 @@ def daily_grading_ev_flow(
                         p9_price=ev.p9_price, cost_to_grade=ev.cost_to_grade,
                         raw_price=ev.raw_price, ev=ev.ev,
                         ev_per_dollar=ev.ev_per_dollar,
-                        sample_size=ev.sample_size,
+                        sample_size=ev.sample_size, p10_pop=ev.p10_pop,
                     ),
                 )
             )

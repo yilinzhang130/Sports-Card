@@ -208,6 +208,7 @@ class GradingEv(Base):
     ev: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     ev_per_dollar: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
     sample_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    p10_pop: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("ix_grading_ev_ev_per_dollar", "ev_per_dollar"),)

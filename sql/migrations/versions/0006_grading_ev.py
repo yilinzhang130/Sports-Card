@@ -30,6 +30,7 @@ def upgrade() -> None:
         sa.Column("ev", sa.Numeric(14, 2), nullable=False),
         sa.Column("ev_per_dollar", sa.Numeric(8, 4), nullable=True),
         sa.Column("sample_size", sa.Integer, nullable=False),
+        sa.Column("p10_pop", sa.Integer, nullable=False, server_default="0"),
         sa.Column("computed_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
     )
     op.create_index("ix_grading_ev_ev_per_dollar", "grading_ev", ["ev_per_dollar"])
