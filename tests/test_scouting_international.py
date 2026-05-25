@@ -31,8 +31,42 @@ from sportscards.scouting.nba import (
 )
 from sportscards.scouting.nba.mle import load_mle_table
 
-# Re-use the canonical NCAA synthetic class.
-from tests.test_scouting import SYNTHETIC, FakeBRefClient
+# Re-use the canonical NCAA synthetic class. Inlined (rather than imported
+# from tests.test_scouting) because CI doesn't expose `tests` as a package.
+SYNTHETIC = [
+    # (slug, name, draft_pick, position, age, usg, ts, trb, ast, stl, blk, sos,
+    #  recruit_pct, true_bpm)
+    ("luka", "Luka Doncic", 3, "PG", 19.2, 32.0, 0.61, 13.0, 28.0, 1.8, 0.7, 8.0, 0.99, 30.0),
+    ("trae", "Trae Young", 5, "PG", 19.8, 36.0, 0.59, 6.0, 35.0, 1.5, 0.4, 6.0, 0.95, 20.0),
+    ("ayton", "Deandre Ayton", 1, "C", 19.9, 28.0, 0.62, 20.0, 4.0, 0.5, 4.0, 7.0, 0.92, 10.0),
+    ("bagley", "Marvin Bagley", 2, "PF", 19.1, 27.0, 0.61, 18.0, 3.0, 0.6, 2.5, 6.5, 0.96, 3.0),
+    ("jjj", "Jaren Jackson", 4, "PF", 18.8, 22.0, 0.60, 14.0, 3.5, 1.0, 5.0, 7.5, 0.91, 18.0),
+    ("mpj", "Michael Porter", 14, "SF", 20.1, 30.0, 0.55, 16.0, 4.0, 0.6, 1.5, 7.0, 0.97, 5.0),
+    ("sga", "SGA", 11, "SG", 20.2, 24.0, 0.60, 7.0, 9.0, 1.6, 0.6, 7.0, 0.88, 25.0),
+    ("knox", "Kevin Knox", 9, "SF", 18.9, 26.0, 0.55, 9.0, 2.5, 0.8, 0.7, 6.0, 0.85, 1.0),
+    ("bridges", "Mikal Bridges", 10, "SF", 21.7, 18.0, 0.61, 7.0, 6.0, 1.5, 1.0, 7.5, 0.80, 14.0),
+    ("walker", "Lonnie Walker", 18, "SG", 19.6, 24.0, 0.54, 6.0, 6.0, 1.1, 0.5, 6.5, 0.82, 2.0),
+    ("smith", "Zhaire Smith", 16, "SG", 19.0, 19.0, 0.60, 8.0, 6.0, 1.7, 1.4, 6.0, 0.78, 0.5),
+    ("robinson", "Mitchell Rob.", 36, "C", 20.0, 25.0, 0.65, 19.0, 2.0, 0.8, 4.5, 5.0, 0.55, 12.0),
+]
+
+
+class FakeBRefClient:
+    def __init__(self, prospects: pd.DataFrame, outcomes: pd.DataFrame) -> None:
+        self._prospects = prospects
+        self._outcomes = outcomes
+
+    def get_draft_class(self, year: int) -> pd.DataFrame:
+        return self._prospects[self._prospects["draft_year"] == year].copy()
+
+    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
+        slug_for_name = self._prospects.loc[self._prospects["name"] == name, "br_slug"]
+        if slug_for_name.empty:
+            raise KeyError(name)
+        slug = slug_for_name.iloc[0]
+        bpm = float(self._outcomes.loc[self._outcomes["br_slug"] == slug, "career_bpm_5y"].iloc[0])
+        return pd.DataFrame({"BPM": [bpm], "WS": [bpm * 2], "VORP": [bpm / 3]})
+
 
 # ---------------------------------------------------------------------------
 # Fake clients
