@@ -87,21 +87,29 @@ def merge_combine(prospects: pd.DataFrame, combine: pd.DataFrame) -> pd.DataFram
 
     combine = combine.drop_duplicates(subset="br_slug", keep="first").copy()
 
+    def _numeric_col(name: str) -> pd.Series:
+        """Return the named column coerced to numeric, or an all-NaN Series
+        of the right length if it's missing. Keeps mypy happy (no None) and
+        lets the rest of the function read uniformly."""
+        if name in combine.columns:
+            return pd.to_numeric(combine[name], errors="coerce")
+        return pd.Series([float("nan")] * len(combine), index=combine.index)
+
     # Derive features that don't exist as raw columns. Use barefoot height
     # for the ape-index numerator (wingspan is also measured barefoot, and
     # post-2022 NBA combines have stopped publishing height_with_shoes for
     # many players). Fall back to height_with_shoes if no-shoes is missing.
-    wingspan = pd.to_numeric(combine.get("wingspan"), errors="coerce")
-    height_ns = pd.to_numeric(combine.get("height_no_shoes"), errors="coerce")
-    height_ws = pd.to_numeric(combine.get("height_with_shoes"), errors="coerce")
+    wingspan = _numeric_col("wingspan")
+    height_ns = _numeric_col("height_no_shoes")
+    height_ws = _numeric_col("height_with_shoes")
     height = height_ns.fillna(height_ws)
-    weight = pd.to_numeric(combine.get("weight"), errors="coerce")
+    weight = _numeric_col("weight")
     combine["wingspan_minus_height"] = wingspan - height
     # Standard BMI formula in imperial units: 703 * lb / in^2.
     with np.errstate(divide="ignore", invalid="ignore"):
         combine["bmi"] = 703.0 * weight / (height**2)
     for col in ("standing_reach", "max_vertical", "lane_agility_time", "three_quarter_sprint"):
-        combine[col] = pd.to_numeric(combine.get(col), errors="coerce")
+        combine[col] = _numeric_col(col)
 
     join_cols = ["br_slug"] + COMBINE_FEATURES
     merged = prospects.merge(combine[join_cols], on="br_slug", how="left")

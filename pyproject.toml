@@ -102,6 +102,7 @@ module = [
     "xgboost.*",
     "optuna",
     "optuna.*",
+    "nba_api.*",
 ]
 ignore_missing_imports = true
 
