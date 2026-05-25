@@ -184,9 +184,10 @@ def test_merge_combine_imputes_missing_and_flags(synthetic_with_combine) -> None
     assert merged[feat.COMBINE_FEATURES].notna().all().all()
 
     # The imputed value is the cohort median of observed rows. Confirm one
-    # feature explicitly to guard against accidental zero-fill.
+    # feature explicitly to guard against accidental zero-fill. Note the
+    # ape-index formula uses height_no_shoes (matches features.merge_combine).
     observed_wingspan_minus = (
-        combine["wingspan"].astype(float) - combine["height_with_shoes"].astype(float)
+        combine["wingspan"].astype(float) - combine["height_no_shoes"].astype(float)
     )
     expected_median = float(observed_wingspan_minus.median())
     nocomb_value = float(

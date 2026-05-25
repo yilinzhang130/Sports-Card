@@ -33,10 +33,14 @@ dependencies = [
 
 [project.optional-dependencies]
 scouting-live = [
-    # Pulled only for the live NBA ingest path. The library is known to break
-    # when Basketball-Reference's HTML changes; tests inject a fake client so
-    # the test suite does not require this dep.
+    # Pulled only for the live NBA ingest path. Both libraries are known to
+    # break when the upstream source changes; tests inject a fake client so
+    # the test suite does not require these deps.
     "basketball-reference-scraper>=1.0.6",
+    # NBA's "unofficial official" stats API; we use the DraftCombineStats
+    # endpoint. The raw stats.nba.com endpoint requires specific headers and
+    # connection handling that this library encapsulates.
+    "nba_api>=1.4",
 ]
 
 [project.scripts]

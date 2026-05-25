@@ -4,11 +4,11 @@ Pulls anthropometric and athletic-testing measurements from the NBA's
 pre-draft combine, persisting one Parquet per draft year to
 ``data/scouting_cache/combine/``.
 
-Source preference:
-    1. ``basketball-reference.com/draft/NBA_<year>_combine.html`` —
-       server-rendered, parseable with pandas + BeautifulSoup. Primary source.
-    2. ``nba.com/draft/combine`` — JS-heavy SPA, used only if BR is missing
-       a year. (Not implemented here; pre-2014 coverage is sparse upstream.)
+Source: NBA's ``stats.nba.com/stats/draftcombinestats`` endpoint via the
+``nba_api`` library. (Basketball-Reference does *not* host combine data;
+nba.com is the only systematic free source.) The library encapsulates the
+specific User-Agent / Referer / x-nba-stats-* headers and connection
+retries that the raw endpoint requires.
 
 Coverage caveat: combine attendance is *voluntary*. Roughly 60-70% of any
 draft class participates, and pre-2014 anthropometric coverage in particular
@@ -33,7 +33,26 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 logger = logging.getLogger(__name__)
 
 CACHE_DIR = Path("data/scouting_cache/combine")
-BREF_MIN_REQ_INTERVAL_S = 3.5  # match ingest_bref pacing — same upstream host
+NBA_API_MIN_REQ_INTERVAL_S = 1.0  # stats.nba.com is generous; 1s is plenty
+
+# Map nba_api column names → our schema. Anything not in this map is dropped
+# (we don't need the 30+ shooting-drill columns for the model).
+_NBA_API_COLUMN_MAP: dict[str, str] = {
+    "PLAYER_NAME": "name",
+    "HEIGHT_WO_SHOES": "height_no_shoes",
+    "HEIGHT_W_SHOES": "height_with_shoes",
+    "WEIGHT": "weight",
+    "WINGSPAN": "wingspan",
+    "STANDING_REACH": "standing_reach",
+    "BODY_FAT_PCT": "body_fat_pct",
+    "HAND_LENGTH": "hand_length",
+    "HAND_WIDTH": "hand_width",
+    "STANDING_VERTICAL_LEAP": "standing_vertical",
+    "MAX_VERTICAL_LEAP": "max_vertical",
+    "LANE_AGILITY_TIME": "lane_agility_time",
+    "THREE_QUARTER_SPRINT": "three_quarter_sprint",
+    "BENCH_PRESS": "bench_press",
+}
 
 COMBINE_COLUMNS = [
     "br_slug",
@@ -54,27 +73,6 @@ COMBINE_COLUMNS = [
     "bench_press",
 ]
 
-# Header strings used by basketball-reference.com on the combine HTML page.
-# Keep this map close to the parser so a BR rename only requires one edit.
-_BREF_HEADER_MAP: dict[str, str] = {
-    "player": "name",
-    "height (no shoes)": "height_no_shoes",
-    "height (with shoes)": "height_with_shoes",
-    "weight (lbs)": "weight",
-    "wingspan": "wingspan",
-    "standing reach": "standing_reach",
-    "body fat %": "body_fat_pct",
-    "hand (length)": "hand_length",
-    "hand (width)": "hand_width",
-    "no step vert": "standing_vertical",
-    "max vert": "max_vertical",
-    "lane agility": "lane_agility_time",
-    "shuttle run": "three_quarter_sprint",  # BR sometimes labels this column "shuttle run"
-    "3/4 court sprint": "three_quarter_sprint",
-    "bench": "bench_press",
-}
-
-
 class CombineClient(Protocol):
     """Narrow protocol — only the call the ingester needs."""
 
@@ -90,51 +88,46 @@ class CombineClient(Protocol):
 
 @dataclass
 class LiveCombineClient:
-    """Production client that pulls the BR combine table for one year.
+    """Production client that pulls one year of combine data via ``nba_api``.
 
-    Kept thin and isolated so it can be swapped or stubbed wholesale. BR's
-    HTML occasionally changes column headers; the client raises and lets the
-    caller decide whether to skip the year.
+    ``stats.nba.com`` indexes the combine by ``season_all_time``, which is
+    the season *after* the draft year (e.g. the 2023 draft class lives under
+    ``"2023-24"``). Coverage starts at 2000 but is sparse anthropometrically
+    before 2014. The library handles required headers + retries; we add a
+    small inter-request sleep on top to be a good citizen.
+
+    ``br_slug`` is *synthesized* as the lowercase, hyphen-joined player name
+    because the NBA endpoint exposes no BR slug. This matches the fallback
+    in ``ingest_bref._normalize_prospects`` and is a best-effort join key.
     """
 
-    sleep_s: float = BREF_MIN_REQ_INTERVAL_S
+    sleep_s: float = NBA_API_MIN_REQ_INTERVAL_S
+    timeout: int = 60
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
     def get_combine(self, year: int) -> pd.DataFrame:  # pragma: no cover - network
-        import requests
+        try:
+            from nba_api.stats.endpoints import DraftCombineStats
+        except ImportError as e:
+            raise RuntimeError(
+                "nba_api not installed — `pip install 'sportscards-quant[scouting-live]'`"
+            ) from e
 
-        url = f"https://www.basketball-reference.com/draft/NBA_{year}_combine.html"
         time.sleep(self.sleep_s)
-        resp = requests.get(url, timeout=30, headers={"User-Agent": "sportscards-quant/0.1"})
-        resp.raise_for_status()
+        season = f"{year}-{str(year + 1)[-2:]}"  # 2023 → "2023-24"
+        raw = DraftCombineStats(season_all_time=season, timeout=self.timeout).get_data_frames()[0]
+        if raw.empty:
+            raise RuntimeError(f"DraftCombineStats returned no rows for {season}")
 
-        # pandas.read_html handles the combine table directly.
-        tables = pd.read_html(resp.text)
-        if not tables:
-            raise RuntimeError(f"no tables found at {url}")
-        df = tables[0]
-
-        # BR uses MultiIndex headers on combine pages — flatten to the inner
-        # level (e.g. ("Anthro", "Wingspan") → "Wingspan").
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = [str(c[-1]) for c in df.columns]
-
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        renamed = {col: _BREF_HEADER_MAP[col] for col in df.columns if col in _BREF_HEADER_MAP}
-        df = df.rename(columns=renamed)
-
-        # Drop interleaved header rows (BR repeats the header every ~20 rows).
-        if "name" in df.columns:
-            df = df[df["name"].astype(str).str.lower() != "player"].copy()
-
-        # Slug derivation — BR doesn't put the slug in the combine HTML, so
-        # we synthesize the lowercase-hyphenated name as a best-effort key.
-        # This matches what the ingest_bref normalizer falls back to for
-        # prospects whose draft row also lacks a slug.
-        df["br_slug"] = (
-            df.get("name", pd.Series(dtype=str)).astype(str).str.lower().str.replace(r"\s+", "-", regex=True)
-        )
+        df = raw.rename(columns=_NBA_API_COLUMN_MAP)
         df["draft_year"] = year
+        df["br_slug"] = (
+            df.get("name", pd.Series(dtype=str))
+            .astype(str)
+            .str.lower()
+            .str.replace(r"\s+", "-", regex=True)
+            .str.replace(r"[^a-z0-9-]", "", regex=True)
+        )
         return cast(pd.DataFrame, df)
 
 

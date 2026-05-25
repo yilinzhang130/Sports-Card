@@ -87,14 +87,19 @@ def merge_combine(prospects: pd.DataFrame, combine: pd.DataFrame) -> pd.DataFram
 
     combine = combine.drop_duplicates(subset="br_slug", keep="first").copy()
 
-    # Derive features that don't exist as raw columns.
+    # Derive features that don't exist as raw columns. Use barefoot height
+    # for the ape-index numerator (wingspan is also measured barefoot, and
+    # post-2022 NBA combines have stopped publishing height_with_shoes for
+    # many players). Fall back to height_with_shoes if no-shoes is missing.
     wingspan = pd.to_numeric(combine.get("wingspan"), errors="coerce")
+    height_ns = pd.to_numeric(combine.get("height_no_shoes"), errors="coerce")
     height_ws = pd.to_numeric(combine.get("height_with_shoes"), errors="coerce")
+    height = height_ns.fillna(height_ws)
     weight = pd.to_numeric(combine.get("weight"), errors="coerce")
-    combine["wingspan_minus_height"] = wingspan - height_ws
+    combine["wingspan_minus_height"] = wingspan - height
     # Standard BMI formula in imperial units: 703 * lb / in^2.
     with np.errstate(divide="ignore", invalid="ignore"):
-        combine["bmi"] = 703.0 * weight / (height_ws ** 2)
+        combine["bmi"] = 703.0 * weight / (height ** 2)
     for col in ("standing_reach", "max_vertical", "lane_agility_time", "three_quarter_sprint"):
         combine[col] = pd.to_numeric(combine.get(col), errors="coerce")
 
