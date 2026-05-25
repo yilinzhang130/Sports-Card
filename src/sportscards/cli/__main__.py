@@ -321,6 +321,93 @@ def deploy_cmd() -> None:
 
 
 @cli.group()
+def model() -> None:
+    """Hedonic fair-value model commands."""
+
+
+@model.command("fit-hedonic")
+@click.option("--train-end", default=None, help="YYYY-MM-DD cutoff for training data")
+@click.option("--synthetic", is_flag=True, help="Generate synthetic tx data first (writes to DB)")
+@click.option("--n-trials", default=20, type=int)
+def fit_hedonic_cmd(train_end: str | None, synthetic: bool, n_trials: int) -> None:
+    from datetime import date as _date
+
+    from sportscards.db.session import session_scope
+    from sportscards.factors.features import build_features
+    from sportscards.factors.hedonic import fit, persist_residuals, predict, save_model
+    from sportscards.factors.synthetic_data import generate_synthetic_transactions
+
+    with session_scope() as s:
+        if synthetic:
+            n = generate_synthetic_transactions(s)
+            click.echo(f"generated {n} synthetic tx rows")
+        df = build_features(s)
+        click.echo(f"feature matrix: {len(df)} rows")
+        if df.empty:
+            click.echo("no rows — aborting")
+            return
+        te = _date.fromisoformat(train_end) if train_end else None
+        model_obj, encoder, metrics = fit(df, train_end=te, n_trials=n_trials)
+        save_model(model_obj, encoder, metrics)
+        pred = predict(model_obj, encoder, df)
+        written = persist_residuals(s, df, pred)
+        click.echo(
+            f"OOS MAE: {metrics['oos_mae']:.4f}  "
+            f"R²: {metrics['oos_r2']:.3f}  residuals written: {written}"
+        )
+
+
+@model.command("rank-mispricing")
+@click.option("--top", default=20, type=int)
+def rank_mispricing_cmd(top: int) -> None:
+    from rich.console import Console
+    from rich.table import Table
+    from sqlalchemy import select
+
+    from sportscards.db.models import Card, Player, TxClean, TxMispricing
+    from sportscards.db.session import session_scope
+
+    with session_scope() as s:
+        stmt = (
+            select(
+                TxMispricing.residual,
+                TxMispricing.predicted_log_price,
+                TxClean.price_usd,
+                TxClean.sold_at,
+                TxClean.slab_grader,
+                TxClean.slab_grade,
+                Card.year,
+                Card.set_name,
+                Card.parallel,
+                Player.name,
+            )
+            .join(TxClean, TxClean.tx_id == TxMispricing.tx_id)
+            .join(Card, Card.card_id == TxClean.card_id)
+            .join(Player, Player.player_id == Card.player_id)
+        )
+        rows = s.execute(stmt).all()
+
+    rows = sorted(rows, key=lambda r: abs(float(r.residual)), reverse=True)[:top]
+
+    console = Console()
+    table = Table(title=f"Top {top} hedonic mispricings (|residual|)")
+    for col in ("player", "year", "set", "parallel", "grade", "price_usd", "pred_log", "residual"):
+        table.add_column(col)
+    for r in rows:
+        table.add_row(
+            str(r.name),
+            str(r.year),
+            str(r.set_name),
+            str(r.parallel),
+            f"{r.slab_grader} {r.slab_grade}",
+            f"${float(r.price_usd):,.2f}",
+            f"{float(r.predicted_log_price):.3f}",
+            f"{float(r.residual):+.3f}",
+        )
+    console.print(table)
+
+
+@cli.group()
 def scouting() -> None:
     """NBA prospect scouting model (PRISM-style pairwise CatBoost)."""
 
