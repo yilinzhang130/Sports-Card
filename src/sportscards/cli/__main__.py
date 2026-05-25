@@ -178,7 +178,14 @@ def portfolio() -> None:
 
 @portfolio.command("plan")
 @click.option("--aum", type=float, default=1_000_000.0)
-def portfolio_plan_cmd(aum: float) -> None:
+@click.option(
+    "--grading-arbitrage-pct",
+    type=float,
+    default=0.0,
+    show_default=True,
+    help="Opt-in grading-arbitrage sleeve as % of AUM (0–10; capped at 10).",
+)
+def portfolio_plan_cmd(aum: float, grading_arbitrage_pct: float) -> None:
     """Print current target weights (anchor-only fallback if no factor data)."""
     import warnings as _w
 
@@ -203,7 +210,10 @@ def portfolio_plan_cmd(aum: float) -> None:
             stardom = load_stardom(s, now)
         positions = build_portfolio(
             UniverseSnapshot(anchors_df=anchors, factor_df=mispricing, prospect_df=stardom),
-            AllocationConfig(total_aum_usd=aum),
+            AllocationConfig(
+                total_aum_usd=aum,
+                grading_arbitrage_weight=grading_arbitrage_pct / 100.0,
+            ),
         )
 
     console = Console()
