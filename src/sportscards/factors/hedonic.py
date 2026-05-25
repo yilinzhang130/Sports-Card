@@ -27,8 +27,8 @@ from sqlalchemy.orm import Session
 
 from sportscards.db.models import TxMispricing
 
-MODEL_VERSION = "hedonic_v1"
-MODEL_PATH = Path("models/hedonic_v1.joblib")
+MODEL_VERSION = "hedonic_v3"
+MODEL_PATH = Path("models/hedonic_v3.joblib")
 
 
 # Order matters — `MONOTONE_CONSTRAINTS` is index-aligned with the
@@ -43,8 +43,10 @@ NUMERICAL_FEATURES: list[str] = [
     "player_age_at_sale",  #  0
     "years_since_draft",  #  0
     "draft_pick",  #  0 (lower pick = better player but signal is noisy)
+    "catalyst_score",  #  0 (context-dependent; can flip sign)
+    "catalyst_score_30d_change",  #  0
 ]
-NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0)
+NUMERICAL_MONOTONE: tuple[int, ...] = (-1, -1, +1, -1, 0, 0, 0, 0, 0, 0)
 
 BOOLEAN_FEATURES: list[str] = [
     "is_rookie",
