@@ -166,7 +166,7 @@ def recent_events(engine: Engine | None = None, days: int = 30, limit: int = 100
         "ORDER BY e.event_date DESC "
         "LIMIT :lim"
     )
-    return pd.read_sql(sql, eng, params={"cutoff": cutoff, "lim": limit})
+    return pd.read_sql(sql, eng, params={"cutoff": cutoff, "lim": limit})  # type: ignore[arg-type]
 
 
 def top_catalysts(engine: Engine | None = None, days: int = 30, limit: int = 10) -> pd.DataFrame:

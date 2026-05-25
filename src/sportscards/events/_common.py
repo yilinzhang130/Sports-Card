@@ -97,10 +97,10 @@ def _to_dict(obj: Any) -> dict[str, Any]:
     # at every call site.
     from dataclasses import asdict, is_dataclass
 
-    if is_dataclass(obj):
+    if is_dataclass(obj) and not isinstance(obj, type):
         return asdict(obj)
     if hasattr(obj, "_asdict"):
-        return obj._asdict()
+        return dict(obj._asdict())
     return dict(obj)
 
 
