@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from prefect import flow, get_run_logger
 from sqlalchemy import select
@@ -21,7 +21,7 @@ def daily_grading_ev_flow(
 ) -> int:
     log = get_run_logger()
     if as_of is None:
-        as_of = datetime.now(tz=timezone.utc)
+        as_of = datetime.now(tz=UTC)
     written = 0
     with session_scope() as s:
         cand_ids = s.execute(

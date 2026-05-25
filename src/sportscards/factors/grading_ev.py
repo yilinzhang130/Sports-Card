@@ -8,11 +8,11 @@ computation (compute_grading_ev / rank_grading_candidates) lands in Task 6.
 
 from __future__ import annotations
 
-import pandas as pd
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 

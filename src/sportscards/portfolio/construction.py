@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import logging
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from datetime import UTC
 from typing import Literal
 
 import pandas as pd
@@ -234,7 +235,7 @@ def build_portfolio(
 
     # --- optional grading-arbitrage overlay ---
     if cfg.grading_arbitrage_weight > 0:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from sportscards.db.session import session_scope
         from sportscards.factors.grading_ev import rank_grading_candidates
@@ -246,7 +247,7 @@ def build_portfolio(
         try:
             with session_scope() as _ga_session:
                 candidates = rank_grading_candidates(
-                    _ga_session, datetime.now(tz=timezone.utc)
+                    _ga_session, datetime.now(tz=UTC)
                 )
         except Exception:
             logger.warning(

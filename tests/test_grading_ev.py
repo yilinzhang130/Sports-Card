@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Base, Card, Player, PopSnapshot
-from sportscards.factors.grading_ev import UNIVERSE_PRIOR, estimate_gem_rate
+from sportscards.db.models import Base, Card, Player, PopSnapshot, TxClean, TxRaw
+from sportscards.factors.grading_ev import (
+    UNIVERSE_PRIOR,
+    compute_grading_ev,
+    estimate_gem_rate,
+    rank_grading_candidates,
+)
 
 
 @pytest.fixture()
@@ -46,7 +51,7 @@ def _add_pop(s: Session, card_id: int, when: datetime, psa8: int, psa9: int, psa
 
 
 def test_gem_rate_uses_latest_snapshot(session):
-    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 1, tzinfo=UTC)
     _add_pop(session, 1, now, psa8=10, psa9=40, psa10=50)
     r = estimate_gem_rate(session, card_id=1, as_of=now)
     # 50 / (10 + 40 + 50) = 0.50, large n → minimal shrinkage
@@ -55,7 +60,7 @@ def test_gem_rate_uses_latest_snapshot(session):
 
 
 def test_gem_rate_small_sample_shrinks_toward_prior(session):
-    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 1, tzinfo=UTC)
     _add_pop(session, 1, now, psa8=0, psa9=0, psa10=2)
     r = estimate_gem_rate(session, card_id=1, as_of=now)
     # raw rate = 1.00; with prior strength = 20 and prior = 0.50,
@@ -65,18 +70,10 @@ def test_gem_rate_small_sample_shrinks_toward_prior(session):
 
 
 def test_gem_rate_no_snapshot_returns_prior(session):
-    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    now = datetime(2026, 5, 1, tzinfo=UTC)
     r = estimate_gem_rate(session, card_id=1, as_of=now)
     assert r.rate == UNIVERSE_PRIOR
     assert r.sample_size == 0
-
-
-from sportscards.db.models import Card, TxClean, TxRaw
-from sportscards.factors.grading_ev import (
-    GradingEV,
-    compute_grading_ev,
-    rank_grading_candidates,
-)
 
 
 def _planted_card(s, card_id, hedonic_p10, hedonic_p9, gem_rate):
@@ -88,19 +85,19 @@ def _planted_card(s, card_id, hedonic_p10, hedonic_p9, gem_rate):
     total = 1000
     psa10 = int(gem_rate * total)
     psa9 = total - psa10
-    _add_pop(s, card_id, datetime(2026, 5, 1, tzinfo=timezone.utc),
+    _add_pop(s, card_id, datetime(2026, 5, 1, tzinfo=UTC),
              psa8=0, psa9=psa9, psa10=psa10)
 
 
 def _add_raw_comp(s, card_id, price):
     raw = TxRaw(source="ebay", external_id=f"x-{card_id}-{price}",
                 raw_title=f"raw-{card_id}", raw_price=Decimal(price),
-                sold_at=datetime(2026, 5, 1, tzinfo=timezone.utc))
+                sold_at=datetime(2026, 5, 1, tzinfo=UTC))
     s.add(raw)
     s.flush()
     s.add(TxClean(raw_id=raw.raw_id, card_id=card_id, slab_grader=None,
                   slab_grade=None, price_usd=Decimal(price),
-                  sold_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+                  sold_at=datetime(2026, 5, 1, tzinfo=UTC),
                   parser_confidence=Decimal("0.90"),
                   parser_method="regex_raw"))
     s.commit()
@@ -111,7 +108,7 @@ def test_compute_grading_ev_matches_formula(session):
     _planted_card(session, 1, hedonic_p10=1000, hedonic_p9=100, gem_rate=0.20)
     _add_raw_comp(session, 1, "80")
     ev = compute_grading_ev(session, card_id=1,
-                            as_of=datetime(2026, 5, 1, tzinfo=timezone.utc))
+                            as_of=datetime(2026, 5, 1, tzinfo=UTC))
     # net P10 = 1000*(1-0.1325)-0.30 = 867.20; net P9 = 100*(1-0.1325)-0.30 = 86.45
     # EV = 0.20*867.20 + 0.80*86.45 − 24.99 − 80 = 173.44 + 69.16 − 104.99 = 137.61
     assert abs(ev.ev - Decimal("137.61")) < Decimal("0.50")
@@ -131,7 +128,7 @@ def test_rank_excludes_negative_ev(session):
     _add_raw_comp(session, 3, "500")  # raw too expensive → negative EV
     df = rank_grading_candidates(
         session,
-        as_of=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        as_of=datetime(2026, 5, 1, tzinfo=UTC),
         min_ev_per_dollar=Decimal("0.15"),
     )
     assert 2 in df["card_id"].tolist()
@@ -141,9 +138,9 @@ def test_rank_excludes_negative_ev(session):
 def test_trend_adjustment_dampens_gem_rate_when_recent_share_drops(session):
     from sportscards.factors.grading_ev import trend_adjustment
 
-    old = datetime(2025, 5, 1, tzinfo=timezone.utc)    # 365d-window start
-    mid = datetime(2026, 2, 1, tzinfo=timezone.utc)    # ~90d ago
-    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    old = datetime(2025, 5, 1, tzinfo=UTC)    # 365d-window start
+    mid = datetime(2026, 2, 1, tzinfo=UTC)    # ~90d ago
+    now = datetime(2026, 5, 1, tzinfo=UTC)
     # Cumulative pop at each snapshot (numbers are TOTAL, not increments):
     #   old: P10=50, P9=50  → snapshot share = 50/100 = 0.50
     #   mid: P10=150, P9=150

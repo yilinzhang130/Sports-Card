@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -816,14 +817,14 @@ def ev() -> None:
 @click.option("--grade-tier", default="value_bulk")
 @click.option("--apply-trend-adjustment", is_flag=True, default=False)
 def ev_compute_cmd(as_of: str | None, grade_tier: str, apply_trend_adjustment: bool) -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from sportscards.flows.daily_grading_ev import daily_grading_ev_flow
 
     parsed_as_of = None
     if as_of is not None:
         dt = datetime.fromisoformat(as_of)
-        parsed_as_of = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        parsed_as_of = dt if dt.tzinfo else dt.replace(tzinfo=UTC)
     n = daily_grading_ev_flow(
         grade_tier=grade_tier,
         apply_trend_adjustment=apply_trend_adjustment,
@@ -837,7 +838,7 @@ def ev_compute_cmd(as_of: str | None, grade_tier: str, apply_trend_adjustment: b
 @click.option("--grade-tier", default="value_bulk")
 @click.option("--min-ev-per-dollar", default=0.15, type=float)
 def ev_top_cmd(limit: int, grade_tier: str, min_ev_per_dollar: float) -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
     from decimal import Decimal
 
     from sportscards.db.session import session_scope
@@ -846,7 +847,7 @@ def ev_top_cmd(limit: int, grade_tier: str, min_ev_per_dollar: float) -> None:
     with session_scope() as s:
         df = rank_grading_candidates(
             s,
-            as_of=datetime.now(tz=timezone.utc),
+            as_of=datetime.now(tz=UTC),
             grade_tier=grade_tier,
             min_ev_per_dollar=Decimal(str(min_ev_per_dollar)),
         )
