@@ -31,7 +31,13 @@ uv run sportscards ingest ebay --since 1d
 
 # 7. Deploy daily flows to Prefect
 uv run sportscards deploy
+
+# 8. Launch the local Trader Console (multi-page Streamlit UI)
+uv run sportscards dashboard      # http://localhost:8501
 ```
+
+See [`docs/trader_console.md`](docs/trader_console.md) for the page-by-page
+reference. The console is localhost-only by design.
 
 ## Scope
 
