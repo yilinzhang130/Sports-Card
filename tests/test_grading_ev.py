@@ -136,3 +136,23 @@ def test_rank_excludes_negative_ev(session):
     )
     assert 2 in df["card_id"].tolist()
     assert 3 not in df["card_id"].tolist()
+
+
+def test_trend_adjustment_dampens_gem_rate_when_recent_share_drops(session):
+    from sportscards.factors.grading_ev import trend_adjustment
+
+    old = datetime(2025, 5, 1, tzinfo=timezone.utc)    # 365d-window start
+    mid = datetime(2026, 2, 1, tzinfo=timezone.utc)    # ~90d ago
+    now = datetime(2026, 5, 1, tzinfo=timezone.utc)
+    # Cumulative pop at each snapshot (numbers are TOTAL, not increments):
+    #   old: P10=50, P9=50  → snapshot share = 50/100 = 0.50
+    #   mid: P10=150, P9=150
+    #   now: P10=152, P9=248 → 90d window: ΔP10=2, ΔP9=98 → share = 2/100 = 0.02
+    # 365d: ΔP10=102, ΔP9=198 → share = 102/300 ≈ 0.34
+    # 0.34 − 0.02 = 0.32 ≥ 0.05 → adj = 0.02 / 0.34 ≈ 0.059 < 1.0  ✓
+    _add_pop(session, 1, old, psa8=0, psa9=50, psa10=50)
+    _add_pop(session, 1, mid, psa8=0, psa9=150, psa10=150)
+    _add_pop(session, 1, now, psa8=0, psa9=248, psa10=152)
+
+    adj = trend_adjustment(session, 1, now)
+    assert adj < Decimal("1")
