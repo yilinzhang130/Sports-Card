@@ -199,3 +199,62 @@ def parse_pending(*, batch_size: int = 1000, allow_llm: bool = True) -> dict[str
     if isinstance(result, dict):
         return result
     return {"result": str(result)}
+
+
+def backtest_run(
+    *,
+    start: str,
+    end: str,
+    aum: float = 1_000_000.0,
+    rebalance_days: int = 90,
+) -> dict[str, Any]:
+    """Run a walk-forward backtest. Replicates the CLI 'backtest run' orchestration."""
+    from datetime import date as _date
+    from datetime import datetime as _datetime
+
+    import pandas as pd
+
+    from sportscards.db.session import session_scope
+    from sportscards.portfolio.adapters import (
+        load_anchors,
+        load_mispricing,
+        load_price_panel,
+        load_stardom,
+    )
+    from sportscards.portfolio.backtester import BacktestConfig, run_backtest
+    from sportscards.portfolio.construction import AllocationConfig, UniverseSnapshot
+
+    start_d = _date.fromisoformat(start)
+    end_d = _date.fromisoformat(end)
+    start_ts = pd.Timestamp(start_d)
+    end_ts = pd.Timestamp(end_d)
+
+    with session_scope() as s:
+        anchors = load_anchors(s)
+        card_ids = anchors["card_id"].tolist() if not anchors.empty else []
+        price_panel = load_price_panel(s, card_ids, start_ts, end_ts)
+
+    def get_universe(as_of: pd.Timestamp) -> UniverseSnapshot:
+        with session_scope() as s2:
+            a = load_anchors(s2, as_of=as_of.to_pydatetime())
+            m = load_mispricing(s2, as_of.to_pydatetime())
+            p = load_stardom(s2, as_of.to_pydatetime())
+        return UniverseSnapshot(anchors_df=a, factor_df=m, prospect_df=p)
+
+    cfg = BacktestConfig(
+        start=start_d,
+        end=end_d,
+        initial_aum_usd=aum,
+        rebalance_freq_days=rebalance_days,
+        allocation=AllocationConfig(total_aum_usd=aum),
+    )
+    result = run_backtest(cfg, get_universe, price_panel)
+
+    # result is BacktestResult; .summary is already a JSON-serialisable dict.
+    summary = result.summary or {}
+    # Attach a compact nav series so the page can chart it.
+    nav_series = [
+        {"as_of": str(idx.date()), "nav": float(v)}
+        for idx, v in result.nav.items()
+    ]
+    return {**summary, "nav": nav_series}
