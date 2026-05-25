@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from sportscards.db.models import Base, Card, Player, PopSnapshot, TxClean, TxRaw
+from sportscards.db.models import Base, Card, Player, PlayerEvent, PopSnapshot, TxClean, TxRaw
 from sportscards.factors.features import (
     build_features,
     parallel_tier,
@@ -248,6 +248,8 @@ def test_build_features_columns_present(session):
         "set_tier",
         "team_market",
         "slab_grader",
+        "catalyst_score",
+        "catalyst_score_30d_change",
     }
     assert expected.issubset(set(df.columns))
     assert np.isfinite(df["log_price"]).all()
@@ -334,3 +336,77 @@ def test_build_features_no_leakage(session):
     assert row["log_pop_psa10"] == pytest.approx(expected_log_pop)
     # And pop_psa9_or_better = 42 + 20 = 62
     assert row["log_pop_psa9_or_better"] == pytest.approx(np.log1p(62))
+
+
+def test_build_features_catalyst_columns(session):
+    """Catalyst score should reflect a recent MVP event for player A; zero for B."""
+    # Player A: has MVP event 10 days before the sale → 0.5 * 0.5**(10/90).
+    # Player B: no events → 0.
+    players = session.query(Player).all()
+    player_a = players[0]  # Modern Rookie (LAL)
+    player_b = players[1]  # Modern Vet (GSW)
+    cards = session.query(Card).all()
+    card_a = next(c for c in cards if c.player_id == player_a.player_id)
+    card_b = next(c for c in cards if c.player_id == player_b.player_id)
+
+    t = datetime(2024, 6, 15, 12, 0, 0)
+
+    session.add(
+        PlayerEvent(
+            player_id=player_a.player_id,
+            event_type="mvp",
+            event_date=t - timedelta(days=10),
+            event_payload={},
+        )
+    )
+
+    for card, ext in ((card_a, "a"), (card_b, "b")):
+        raw = TxRaw(
+            source="test",
+            raw_title=f"cat-{ext}",
+            raw_price=Decimal("100.00"),
+            raw_currency="USD",
+            sold_at=t,
+            external_id=f"cat-{ext}",
+            raw_json={},
+        )
+        session.add(raw)
+        session.flush()
+        session.add(
+            TxClean(
+                raw_id=raw.raw_id,
+                card_id=card.card_id,
+                slab_grader="PSA",
+                slab_grade=Decimal("10"),
+                price_usd=Decimal("100.00"),
+                sold_at=t,
+                parser_confidence=Decimal("1.000"),
+                parser_method="test",
+            )
+        )
+    session.commit()
+
+    df = build_features(session)
+    assert "catalyst_score" in df.columns
+    assert "catalyst_score_30d_change" in df.columns
+
+    # Find rows by looking up tx prices/timing — we have exactly 2 PSA 10
+    # tx in the DB now.
+    assert len(df) == 2
+
+    # player A expected MVP contribution at age 10 days from end-of-day UTC.
+    # _as_datetime_utc(date) maps a date to 23:59:59.999999; tx sold_at is
+    # 12:00:00 UTC same calendar day. as_of in features.py uses normalized
+    # day (00:00:00). Event is at t-10d 12:00. age in days from day 00:00 is
+    # 10 - 0.5 = 9.5 days (sold_at_day at 00:00, event at 12:00 of day-10).
+    # Use the actual computed value rather than recomputing the decay here;
+    # assert it's in the right ballpark.
+    # Identify A and B rows by joining back through cards->players is complex;
+    # simpler: one has nonzero catalyst, the other is zero.
+    nonzero = df[df["catalyst_score"] != 0]
+    zero = df[df["catalyst_score"] == 0]
+    assert len(nonzero) == 1
+    assert len(zero) == 1
+    # Expected ≈ 0.5 * 0.5 ** (9.5/90) ≈ 0.4647 (sold_at_day normalize → 00:00)
+    expected = 0.5 * (0.5 ** (9.5 / 90))
+    assert nonzero.iloc[0]["catalyst_score"] == pytest.approx(expected, rel=0.01)

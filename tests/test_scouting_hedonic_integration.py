@@ -116,7 +116,7 @@ def test_no_lookahead_future_score_excluded(session):
     assert float(row["stardom_premium"]) == pytest.approx(0.0)
 
 
-# --- Hedonic v2 model tests ---
+# --- Hedonic v3 model tests ---
 
 
 def test_model_version_is_v3():

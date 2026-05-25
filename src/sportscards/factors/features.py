@@ -24,6 +24,7 @@ from sportscards.db.models import (
     PopSnapshot,
     TxClean,
 )
+from sportscards.factors.catalyst import compute_catalyst_scores_bulk
 
 # ---------------------------------------------------------------------------
 # Per-card categorical helpers
@@ -355,6 +356,35 @@ def build_features(session: Session) -> pd.DataFrame:
     df["stardom_premium"] = df["stardom_premium"].astype(float).fillna(cohort_median)
     df["stardom_premium_x_is_rookie"] = df["stardom_premium"] * df["is_rookie"].astype(float)
 
+    # --- Catalyst features (per player-day; one bulk query per day) ---
+    # Compute one score per distinct (player_id, sold_at_day) and broadcast
+    # back. Intra-day variation is irrelevant — the score only steps when a
+    # new event lands. as_of MUST be the row's sold_at to avoid leakage.
+    df["sold_at_day"] = df["sold_at"].dt.normalize()
+    catalyst_now: dict[tuple[int, pd.Timestamp], float] = {}
+    catalyst_prev: dict[tuple[int, pd.Timestamp], float] = {}
+    for day, sub in df.groupby("sold_at_day"):
+        pids = [int(p) for p in sub["player_id"].dropna().unique().tolist()]
+        if not pids:
+            continue
+        as_of = day.to_pydatetime()
+        prev_of = (day - pd.Timedelta(days=30)).to_pydatetime()
+        now_scores = compute_catalyst_scores_bulk(session, pids, as_of)
+        prev_scores = compute_catalyst_scores_bulk(session, pids, prev_of)
+        for pid in pids:
+            catalyst_now[(pid, day)] = float(now_scores.get(pid, 0))
+            catalyst_prev[(pid, day)] = float(prev_scores.get(pid, 0))
+
+    def _lookup_now(row: pd.Series) -> float:
+        return catalyst_now.get((int(row["player_id"]), row["sold_at_day"]), 0.0)
+
+    def _lookup_change(row: pd.Series) -> float:
+        key = (int(row["player_id"]), row["sold_at_day"])
+        return catalyst_now.get(key, 0.0) - catalyst_prev.get(key, 0.0)
+
+    df["catalyst_score"] = df.apply(_lookup_now, axis=1).astype(float)
+    df["catalyst_score_30d_change"] = df.apply(_lookup_change, axis=1).astype(float)
+
     out_cols = [
         # identifiers
         "tx_id",
@@ -371,24 +401,26 @@ def build_features(session: Session) -> pd.DataFrame:
         "player_age_at_sale",
         "years_since_draft",
         "draft_pick",
+        "stardom_premium",
+        "stardom_premium_x_is_rookie",
+        "catalyst_score",
+        "catalyst_score_30d_change",
+        # momentum + liquidity numerical
+        "cs_momentum_pct",
+        "log_sales_count_90d",
+        "bid_ask_proxy",
         # boolean (int 0/1)
         "is_rookie",
         "has_auto",
         "has_patch",
         "is_one_of_one",
         "era_modern",
-        # momentum + liquidity
-        "cs_momentum_pct",
         "is_hyped",
-        "log_sales_count_90d",
-        "bid_ask_proxy",
+        "has_stardom_score",
         # categorical (str)
         "set_tier",
         "team_market",
         "slab_grader",
         "liquidity_tier",
-        "stardom_premium",
-        "has_stardom_score",
-        "stardom_premium_x_is_rookie",
     ]
     return df[out_cols].reset_index(drop=True)

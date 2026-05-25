@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import joblib
 import numpy as np
 import pytest
 from sqlalchemy import create_engine, select
@@ -13,6 +14,7 @@ from sportscards.db.models import Base, Card, Player, TxMispricing
 from sportscards.factors.features import build_features
 from sportscards.factors.hedonic import (
     BOOLEAN_FEATURES,
+    MODEL_VERSION,
     NUMERICAL_FEATURES,
     NUMERICAL_MONOTONE,
     _build_design_matrix,
@@ -353,3 +355,7 @@ def test_save_load_model_round_trip(trained, tmp_path):
     p2 = predict(model2, encoder2, df)
     np.testing.assert_array_equal(p1, p2)
     assert metrics2["oos_mae"] == trained["metrics"]["oos_mae"]
+
+    # Confirm model_version stamped on the saved bundle is v3.
+    bundle = joblib.load(path)
+    assert bundle["model_version"] == MODEL_VERSION == "hedonic_v3"

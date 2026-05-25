@@ -1,10 +1,10 @@
 """grading_ev table for raw → PSA 10 optionality model.
 
-Revision ID: 0008
-Revises: 0007
+Revision ID: 0009
+Revises: 0008
 Create Date: 2026-05-25
 
-Chained after 0007_factor_panel (momentum + liquidity factors) which
+Chained after 0008_player_events (NBA catalyst event overlay) which
 landed on main while this branch was open.
 """
 
@@ -13,8 +13,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0008"
-down_revision: str | None = "0007"
+revision: str = "0009"
+down_revision: str | None = "0008"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

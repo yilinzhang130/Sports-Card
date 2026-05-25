@@ -3354,6 +3354,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+events-live = [
+    { name = "nba-api" },
+]
 scouting-live = [
     { name = "basketball-reference-scraper" },
     { name = "nba-api" },
@@ -3379,6 +3382,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "joblib", specifier = ">=1.4" },
+    { name = "nba-api", marker = "extra == 'events-live'", specifier = ">=1.4" },
     { name = "nba-api", marker = "extra == 'scouting-live'", specifier = ">=1.4" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "openai", specifier = ">=1.50" },
@@ -3400,7 +3404,7 @@ requires-dist = [
     { name = "tenacity", specifier = ">=9.0" },
     { name = "xgboost", specifier = ">=2.0" },
 ]
-provides-extras = ["scouting-live"]
+provides-extras = ["scouting-live", "events-live"]
 
 [package.metadata.requires-dev]
 dev = [

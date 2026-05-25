@@ -46,6 +46,9 @@ class AllocationConfig:
     # This is an *additional* sleeve funded from AUM on top of the core barbell;
     # anchor_weight + factor_weight + prospect_weight must still sum to 1.0.
     grading_arbitrage_weight: float = 0.0
+    tactical_tilt: bool = False
+    tactical_tilt_pct: float = 0.20  # ±20% reshuffle within sleeve
+    tactical_top_quintile: int = 5  # top 1/N gets boost, bottom 1/N gets cut
 
     def __post_init__(self) -> None:
         total = self.anchor_weight + self.factor_weight + self.prospect_weight
@@ -244,9 +247,141 @@ def _momentum_tilt(
 _DEFAULT_ALLOC = AllocationConfig()
 
 
+def _sleeve_cap(sleeve: Sleeve, cfg: AllocationConfig) -> float:
+    if sleeve == "anchor":
+        return cfg.anchor_position_cap_pct
+    if sleeve == "prospect":
+        return cfg.prospect_per_name_cap_pct
+    return cfg.other_position_cap_pct
+
+
+def _apply_tactical_tilt(
+    positions: list[TargetPosition],
+    catalyst_scores: dict[int, float],
+    cfg: AllocationConfig,
+    aum: float,
+) -> list[TargetPosition]:
+    """Reshuffle ±tactical_tilt_pct within each sleeve based on catalyst score.
+
+    Sleeve total weight (sign-preserving) is preserved within float epsilon.
+    Per-name caps are clamped after tilt (surplus is dropped — sleeve total
+    may shrink slightly when clamping binds).
+    """
+    if not positions:
+        return positions
+
+    by_sleeve: dict[Sleeve, list[TargetPosition]] = {}
+    for p in positions:
+        by_sleeve.setdefault(p.sleeve, []).append(p)
+
+    tilt = cfg.tactical_tilt_pct
+    quintile = cfg.tactical_top_quintile
+    out: list[TargetPosition] = []
+
+    for sleeve, sleeve_positions in by_sleeve.items():
+        n = len(sleeve_positions)
+        if n == 0:
+            out.extend(sleeve_positions)
+            continue
+
+        # Preserve sign — shorts are negative; tilt by absolute magnitude
+        sign = -1.0 if sleeve == "factor_short" else 1.0
+
+        # Rank by score; missing → 0.0
+        scored = [(p, catalyst_scores.get(p.card_id, 0.0)) for p in sleeve_positions]
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        k = max(0, n // quintile)
+        top_ids = {scored[i][0].card_id for i in range(k)}
+        bot_ids = {scored[n - 1 - i][0].card_id for i in range(k)} if k > 0 else set()
+        # Avoid overlap when n is tiny (e.g. n < 2*quintile)
+        bot_ids -= top_ids
+
+        cap = _sleeve_cap(sleeve, cfg)
+
+        new_weights: dict[int, float] = {}
+        total_boost = 0.0
+        total_cut = 0.0
+        for p in sleeve_positions:
+            abs_w = abs(p.target_weight_pct)
+            if p.card_id in top_ids:
+                delta = tilt * abs_w
+                new_w = abs_w + delta
+                total_boost += delta
+            elif p.card_id in bot_ids:
+                delta = tilt * abs_w
+                new_w = abs_w - delta
+                total_cut += delta
+            else:
+                new_w = abs_w
+            new_weights[p.card_id] = new_w
+
+        # Renormalize: if boost > cut, trim middle (and overflow into top redistribution
+        # if everything is top/bottom); if cut > boost, expand middle.
+        net = total_boost - total_cut
+        middle_ids = [
+            p.card_id
+            for p in sleeve_positions
+            if p.card_id not in top_ids and p.card_id not in bot_ids
+        ]
+        if abs(net) > 1e-12:
+            if middle_ids:
+                middle_total = sum(new_weights[cid] for cid in middle_ids)
+                if middle_total > 1e-12:
+                    factor = max(0.0, (middle_total - net) / middle_total)
+                    for cid in middle_ids:
+                        new_weights[cid] *= factor
+                else:
+                    # middle weights are zero — distribute against top/bottom instead
+                    if net > 0 and top_ids:
+                        # need to cut boost
+                        per = net / len(top_ids)
+                        for cid in top_ids:
+                            new_weights[cid] = max(0.0, new_weights[cid] - per)
+                    elif net < 0 and bot_ids:
+                        per = (-net) / len(bot_ids)
+                        for cid in bot_ids:
+                            new_weights[cid] += per
+            else:
+                # No middle: adjust top/bottom symmetrically
+                if net > 0 and top_ids:
+                    per = net / len(top_ids)
+                    for cid in top_ids:
+                        new_weights[cid] = max(0.0, new_weights[cid] - per)
+                elif net < 0 and bot_ids:
+                    per = (-net) / len(bot_ids)
+                    for cid in bot_ids:
+                        new_weights[cid] += per
+
+        # Clamp at per-name cap (sleeve total may shrink slightly when binds)
+        for cid in new_weights:
+            if new_weights[cid] > cap:
+                new_weights[cid] = cap
+
+        # Rebuild positions in original order; drop zero-weight names
+        for p in sleeve_positions:
+            w = new_weights[p.card_id]
+            if w <= 1e-12:
+                continue
+            signed_w = sign * w
+            out.append(
+                TargetPosition(
+                    card_id=p.card_id,
+                    sleeve=sleeve,
+                    target_weight_pct=signed_w,
+                    target_usd_value=signed_w * aum,
+                    signal_source=p.signal_source,
+                )
+            )
+
+    return out
+
+
 def build_portfolio(
     universe: UniverseSnapshot,
     cfg: AllocationConfig = _DEFAULT_ALLOC,
+    *,
+    catalyst_scores: dict[int, float] | None = None,
 ) -> list[TargetPosition]:
     """Build a barbell portfolio. Returns target positions summing to ≤ 1.0."""
     anchor_w = cfg.anchor_weight
@@ -328,7 +463,17 @@ def build_portfolio(
         )
         positions.extend(pp)
 
-    # --- optional grading-arbitrage overlay ---
+    if cfg.tactical_tilt:
+        if catalyst_scores is None:
+            warnings.warn(
+                "tactical_tilt requested but catalyst_scores not provided — skipping tilt",
+                stacklevel=2,
+            )
+        else:
+            positions = _apply_tactical_tilt(positions, catalyst_scores, cfg, aum)
+
+    # --- optional grading-arbitrage overlay (runs after tactical tilt; this
+    # sleeve holds raw inventory and isn't subject to catalyst tilts) ---
     if cfg.grading_arbitrage_weight > 0:
         from datetime import datetime
 
