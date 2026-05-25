@@ -292,9 +292,7 @@ class ModelRunLog(Base):
 
     run_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
-    params_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, server_default="{}"
-    )
+    params_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, server_default="{}")
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

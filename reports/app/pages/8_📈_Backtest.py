@@ -1,4 +1,5 @@
 """Backtest — launch walk-forward runs and inspect history."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -103,12 +104,7 @@ st.markdown("---")
 st.subheader("Run history")
 try:
     with session_scope() as ss:
-        history = (
-            ss.query(BacktestRun)
-            .order_by(BacktestRun.run_id.desc())
-            .limit(50)
-            .all()
-        )
+        history = ss.query(BacktestRun).order_by(BacktestRun.run_id.desc()).limit(50).all()
         history_data = [
             {
                 "run_id": h.run_id,

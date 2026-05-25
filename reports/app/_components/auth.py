@@ -1,4 +1,5 @@
 """Localhost-only request guard for the Trader Console."""
+
 from __future__ import annotations
 
 import streamlit as st

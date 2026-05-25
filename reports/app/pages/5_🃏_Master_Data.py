@@ -1,4 +1,5 @@
 """Master Data — card_master / player_master CRUD + PSA spec mapping."""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -144,45 +145,51 @@ with tab_psa:
         st.success("No TBD entries.")
     else:
         with session_scope() as s:
-            cards_lookup = {
-                c.card_id: c for c in s.query(Card).filter(Card.card_id.in_(tbd)).all()
-            }
+            cards_lookup = {c.card_id: c for c in s.query(Card).filter(Card.card_id.in_(tbd)).all()}
         for cid in tbd:
             c = cards_lookup.get(cid)
-            label = (
-                f"card_id={cid}"
-                + (f" — {c.year} {c.manufacturer} {c.set_name} #{c.card_number} {c.parallel}" if c else "")
+            detail = (
+                f" — {c.year} {c.manufacturer} {c.set_name} #{c.card_number} {c.parallel}"
+                if c
+                else ""
             )
-            with st.expander(label):
-                with st.form(f"psa_form_{cid}"):
-                    cert = st.text_input("Cert # for lookup (optional)", key=f"cert_{cid}")
-                    spec_id = st.text_input("PSA spec_id", key=f"spec_{cid}")
-                    cl_spec_id = st.text_input("Card Ladder spec_id (optional)", key=f"cl_{cid}")
-                    lookup_clicked = st.form_submit_button("Lookup by cert#")
-                    save_clicked = st.form_submit_button("Save")
-                    if lookup_clicked and cert:
-                        try:
-                            from sportscards.ingest.psa_api import PsaClient
-                            client = PsaClient()
-                            payload = client.get_cert(cert)
-                            looked_up = payload.get("SpecID") or payload.get("SpecId") or payload.get("spec_id")
-                            if looked_up:
-                                st.success(f"SpecID={looked_up} — paste into the field and Save.")
-                            else:
-                                st.warning(f"No SpecID in response: {payload}")
-                        except Exception as e:  # pragma: no cover
-                            st.error(f"lookup failed: {e}")
-                    if save_clicked and spec_id:
-                        set_spec_id(cid, spec_id)
-                        if cl_spec_id:
-                            with session_scope() as s:
-                                s.add(CardLadderSpecMap(cl_spec_id=cl_spec_id, card_id=cid))
-                        write_audit(
-                            "psa_spec_map_save",
-                            {"card_id": cid, "psa_spec_id": spec_id, "cl_spec_id": cl_spec_id or None},
+            label = f"card_id={cid}{detail}"
+            with st.expander(label), st.form(f"psa_form_{cid}"):
+                cert = st.text_input("Cert # for lookup (optional)", key=f"cert_{cid}")
+                spec_id = st.text_input("PSA spec_id", key=f"spec_{cid}")
+                cl_spec_id = st.text_input("Card Ladder spec_id (optional)", key=f"cl_{cid}")
+                lookup_clicked = st.form_submit_button("Lookup by cert#")
+                save_clicked = st.form_submit_button("Save")
+                if lookup_clicked and cert:
+                    try:
+                        from sportscards.ingest.psa_api import PsaClient
+
+                        client = PsaClient()
+                        payload = client.get_cert(cert)
+                        looked_up = (
+                            payload.get("SpecID") or payload.get("SpecId") or payload.get("spec_id")
                         )
-                        st.success(f"saved spec_id={spec_id} for card_id={cid}")
-                        st.rerun()
+                        if looked_up:
+                            st.success(f"SpecID={looked_up} — paste into the field and Save.")
+                        else:
+                            st.warning(f"No SpecID in response: {payload}")
+                    except Exception as e:  # pragma: no cover
+                        st.error(f"lookup failed: {e}")
+                if save_clicked and spec_id:
+                    set_spec_id(cid, spec_id)
+                    if cl_spec_id:
+                        with session_scope() as s:
+                            s.add(CardLadderSpecMap(cl_spec_id=cl_spec_id, card_id=cid))
+                    write_audit(
+                        "psa_spec_map_save",
+                        {
+                            "card_id": cid,
+                            "psa_spec_id": spec_id,
+                            "cl_spec_id": cl_spec_id or None,
+                        },
+                    )
+                    st.success(f"saved spec_id={spec_id} for card_id={cid}")
+                    st.rerun()
 
     st.markdown("---")
     st.caption("Current priority YAML")

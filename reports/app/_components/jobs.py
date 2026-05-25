@@ -1,12 +1,14 @@
 """Single-worker background job runner with model_run_log persistence."""
+
 from __future__ import annotations
 
 import threading
 import time
 import traceback
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
-from typing import Any, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 from sportscards.db.models import ModelRunLog
 from sportscards.db.session import session_scope
@@ -55,7 +57,7 @@ def _finalize(
         row.status = status
         row.summary_json = summary
         row.error = error
-        row.finished_at = datetime.now(timezone.utc)
+        row.finished_at = datetime.now(UTC)
 
 
 def get_status(run_id: int) -> dict[str, Any]:

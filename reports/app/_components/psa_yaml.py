@@ -1,6 +1,8 @@
 """Safe read/write helpers for psa_priority.yaml."""
+
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -33,7 +35,7 @@ def load_priority() -> list[dict[str, Any]]:
 def save_priority(rows: list[dict[str, Any]]) -> None:
     """Atomic write."""
     _YAML_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = tempfile.NamedTemporaryFile(
+    tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115 — manual close needed for atomic os.replace
         "w", dir=_YAML_PATH.parent, prefix=".psa_priority_", suffix=".tmp", delete=False
     )
     try:
@@ -43,10 +45,8 @@ def save_priority(rows: list[dict[str, Any]]) -> None:
         tmp.close()
         os.replace(tmp.name, _YAML_PATH)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp.name)
-        except OSError:
-            pass
         raise
 
 

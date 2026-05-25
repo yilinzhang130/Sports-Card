@@ -1,4 +1,5 @@
 """Ingest — upload CSVs and trigger network fetches."""
+
 from __future__ import annotations
 
 import os
@@ -104,9 +105,7 @@ with st.expander("PSA pop snapshot"):
         ok = confirm_toggle("confirm_psa")
         submitted = st.form_submit_button("Snapshot now", disabled=not ok)
         if submitted:
-            run_id = submit_job(
-                "psa_pop", actions.daily_psa_pop, params={}, kwargs={}
-            )
+            run_id = submit_job("psa_pop", actions.daily_psa_pop, params={}, kwargs={})
             st.session_state["job_psa"] = run_id
             st.rerun()
     _render_status("job_psa")

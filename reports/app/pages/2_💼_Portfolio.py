@@ -1,4 +1,5 @@
 """Portfolio — target weights, overrides, holdings ledger."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -114,48 +115,46 @@ if held:
 else:
     st.info("No held positions recorded yet.")
 
-with st.expander("Record a buy"):
-    with st.form("buy_form"):
-        b_card_id = st.number_input("card_id", min_value=1, step=1, key="buy_card")
-        b_cert = st.text_input("Cert number (optional)")
-        b_grader = st.text_input("Slab grader (e.g. PSA)", value="PSA")
-        b_grade = st.number_input("Grade", 0.0, 10.0, 10.0, 0.5)
-        b_at = st.date_input("Acquired at", value=datetime.utcnow().date())
-        b_cost = st.number_input("Cost USD", 0.0, step=1.0)
-        b_channel = st.text_input("Channel (e.g. ebay)", value="ebay")
-        ok = confirm_toggle("confirm_buy")
-        submitted = st.form_submit_button("Record buy", disabled=not ok)
-        if submitted:
-            add_holding(
-                card_id=int(b_card_id),
-                cert_number=b_cert or None,
-                slab_grader=b_grader or None,
-                slab_grade=Decimal(str(b_grade)),
-                acquired_at=datetime.combine(b_at, datetime.min.time()),
-                acquired_cost_usd=Decimal(str(b_cost)),
-                channel=b_channel,
-            )
-            st.success("buy recorded")
-            st.rerun()
+with st.expander("Record a buy"), st.form("buy_form"):
+    b_card_id = st.number_input("card_id", min_value=1, step=1, key="buy_card")
+    b_cert = st.text_input("Cert number (optional)")
+    b_grader = st.text_input("Slab grader (e.g. PSA)", value="PSA")
+    b_grade = st.number_input("Grade", 0.0, 10.0, 10.0, 0.5)
+    b_at = st.date_input("Acquired at", value=datetime.utcnow().date())
+    b_cost = st.number_input("Cost USD", 0.0, step=1.0)
+    b_channel = st.text_input("Channel (e.g. ebay)", value="ebay")
+    ok = confirm_toggle("confirm_buy")
+    submitted = st.form_submit_button("Record buy", disabled=not ok)
+    if submitted:
+        add_holding(
+            card_id=int(b_card_id),
+            cert_number=b_cert or None,
+            slab_grader=b_grader or None,
+            slab_grade=Decimal(str(b_grade)),
+            acquired_at=datetime.combine(b_at, datetime.min.time()),
+            acquired_cost_usd=Decimal(str(b_cost)),
+            channel=b_channel,
+        )
+        st.success("buy recorded")
+        st.rerun()
 
-with st.expander("Mark sold"):
-    with st.form("sell_form"):
-        s_id = st.number_input("holding_id", min_value=1, step=1)
-        s_at = st.date_input("Sold at", value=datetime.utcnow().date())
-        s_proceeds = st.number_input("Proceeds USD", 0.0, step=1.0)
-        ok = confirm_toggle("confirm_sell")
-        submitted = st.form_submit_button("Mark sold", disabled=not ok)
-        if submitted:
-            try:
-                mark_sold(
-                    int(s_id),
-                    sold_at=datetime.combine(s_at, datetime.min.time()),
-                    sold_proceeds_usd=Decimal(str(s_proceeds)),
-                )
-                st.success("sale recorded")
-                st.rerun()
-            except KeyError as e:
-                st.error(str(e))
+with st.expander("Mark sold"), st.form("sell_form"):
+    s_id = st.number_input("holding_id", min_value=1, step=1)
+    s_at = st.date_input("Sold at", value=datetime.utcnow().date())
+    s_proceeds = st.number_input("Proceeds USD", 0.0, step=1.0)
+    ok = confirm_toggle("confirm_sell")
+    submitted = st.form_submit_button("Mark sold", disabled=not ok)
+    if submitted:
+        try:
+            mark_sold(
+                int(s_id),
+                sold_at=datetime.combine(s_at, datetime.min.time()),
+                sold_proceeds_usd=Decimal(str(s_proceeds)),
+            )
+            st.success("sale recorded")
+            st.rerun()
+        except KeyError as e:
+            st.error(str(e))
 
 
 # --- Trade list --------------------------------------------------------------

@@ -1,6 +1,7 @@
 """trader console: overrides, holdings, model_run_log, audit_log"""
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0008"
 down_revision = "0007"
@@ -15,7 +16,12 @@ def upgrade() -> None:
         sa.Column("target_weight_pct", sa.Numeric(8, 5), nullable=False),
         sa.Column("reason", sa.Text, nullable=False),
         sa.Column("set_by", sa.String(64), nullable=False, server_default="ui"),
-        sa.Column("set_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "set_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     op.create_table(
         "portfolio_holdings",
@@ -38,7 +44,12 @@ def upgrade() -> None:
         sa.Column("run_id", sa.Integer, primary_key=True, autoincrement=True),
         sa.Column("action", sa.String(64), nullable=False),
         sa.Column("params_json", sa.JSON, nullable=False, server_default="{}"),
-        sa.Column("started_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "started_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
         sa.Column("status", sa.String(16), nullable=False, server_default="running"),
         sa.Column("summary_json", sa.JSON),

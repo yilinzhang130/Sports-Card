@@ -39,7 +39,8 @@ def upgrade() -> None:
     if bind.dialect.name == "postgresql":
         with contextlib.suppress(Exception):
             op.execute(
-                "SELECT create_hypertable('repeat_sales_index', 'period_start', if_not_exists => TRUE)"
+                "SELECT create_hypertable('repeat_sales_index', 'period_start', "
+                "if_not_exists => TRUE)"
             )
 
 

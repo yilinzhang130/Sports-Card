@@ -1,6 +1,6 @@
 import time
 
-from reports.app._components.jobs import submit_job, get_status, wait_for, has_running_jobs
+from reports.app._components.jobs import has_running_jobs, submit_job, wait_for
 
 
 def _quick(x):

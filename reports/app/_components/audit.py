@@ -1,5 +1,7 @@
 """Audit log writer for the Trader Console UI."""
+
 from __future__ import annotations
+
 from typing import Any
 
 from sportscards.db.models import AuditLog

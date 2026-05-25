@@ -6,6 +6,7 @@ Each function MUST:
   * return a JSON-serializable dict summary,
   * raise on failure (the job runner records the traceback).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -210,7 +211,6 @@ def backtest_run(
 ) -> dict[str, Any]:
     """Run a walk-forward backtest. Replicates the CLI 'backtest run' orchestration."""
     from datetime import date as _date
-    from datetime import datetime as _datetime
 
     import pandas as pd
 
@@ -253,8 +253,5 @@ def backtest_run(
     # result is BacktestResult; .summary is already a JSON-serialisable dict.
     summary = result.summary or {}
     # Attach a compact nav series so the page can chart it.
-    nav_series = [
-        {"as_of": str(idx.date()), "nav": float(v)}
-        for idx, v in result.nav.items()
-    ]
+    nav_series = [{"as_of": str(idx.date()), "nav": float(v)} for idx, v in result.nav.items()]
     return {**summary, "nav": nav_series}

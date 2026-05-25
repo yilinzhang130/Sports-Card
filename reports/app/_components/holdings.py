@@ -1,4 +1,5 @@
 """portfolio_holdings ledger CRUD."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -7,10 +8,9 @@ from typing import Any
 
 from sqlalchemy import func
 
+from reports.app._components.audit import write_audit
 from sportscards.db.models import PortfolioHolding
 from sportscards.db.session import session_scope
-
-from reports.app._components.audit import write_audit
 
 
 def add_holding(

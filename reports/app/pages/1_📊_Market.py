@@ -3,6 +3,7 @@
 Tabs: Index, Mispricing, Prospects, Forward Prospects, Factor Panel.
 (Data Health lives on Home.py.)
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -22,6 +23,7 @@ st.title("📊 Market")
 
 
 # --- cached query wrappers ---------------------------------------------------
+
 
 @st.cache_data(ttl=300)
 def _cached_index() -> pd.DataFrame:
@@ -58,6 +60,7 @@ def _placeholder(phase: str) -> None:
 
 
 # --- tab implementations (verbatim from legacy dashboard) --------------------
+
 
 def _market_tab() -> None:
     st.header("Market Overview")

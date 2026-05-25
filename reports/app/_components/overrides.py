@@ -1,13 +1,13 @@
 """portfolio_overrides read/write helpers."""
+
 from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
 
+from reports.app._components.audit import write_audit
 from sportscards.db.models import PortfolioOverride
 from sportscards.db.session import session_scope
-
-from reports.app._components.audit import write_audit
 
 
 def set_override(card_id: int, weight: Decimal, *, reason: str, actor: str = "ui") -> None:

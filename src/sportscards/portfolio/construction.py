@@ -13,6 +13,10 @@ remaining sleeves and a ``UserWarning`` is emitted.
 from __future__ import annotations
 
 import warnings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 from dataclasses import dataclass
 from typing import Literal
 
@@ -320,9 +324,7 @@ def total_long_weight(positions: list[TargetPosition]) -> float:
     return sum(p.target_weight_pct for p in positions if p.target_weight_pct > 0)
 
 
-def apply_overrides(
-    positions: list[TargetPosition], session
-) -> list[TargetPosition]:
+def apply_overrides(positions: list[TargetPosition], session: Session) -> list[TargetPosition]:
     """Replace target_weight_pct on positions whose card_id has an override row.
 
     Degrades gracefully — if portfolio_overrides table is missing, returns
@@ -337,7 +339,8 @@ def apply_overrides(
 
     from sportscards.db.models import PortfolioOverride
 
-    if not _inspect(session.bind).has_table("portfolio_overrides"):
+    bind = session.bind
+    if bind is None or not _inspect(bind).has_table("portfolio_overrides"):
         return positions
 
     rows = {r.card_id: r for r in session.query(PortfolioOverride).all()}

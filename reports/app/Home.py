@@ -3,6 +3,7 @@
 Localhost-only operator UI. The sportscards CLI remains the canonical surface;
 this UI is a convenience. Use the sidebar to navigate.
 """
+
 from __future__ import annotations
 
 import streamlit as st

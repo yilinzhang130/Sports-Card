@@ -1,13 +1,13 @@
 """Pure helpers for the Parse Triage page — separated for testability."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
 
+from reports.app._components.audit import write_audit
 from sportscards.db.models import ParseFailure, TxClean
 from sportscards.db.session import session_scope
-
-from reports.app._components.audit import write_audit
 
 
 def apply_manual_correction(

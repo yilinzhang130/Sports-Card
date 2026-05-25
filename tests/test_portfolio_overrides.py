@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pandas as pd
 
-from reports.app._components.overrides import set_override, list_overrides
+from reports.app._components.overrides import list_overrides, set_override
 from sportscards.db.session import session_scope
 from sportscards.portfolio.construction import (
     AllocationConfig,
@@ -49,5 +49,6 @@ def test_list_overrides_roundtrip(migrated_db):
 
 def test_portfolio_page_renders(migrated_db):
     from streamlit.testing.v1 import AppTest
+
     at = AppTest.from_file("reports/app/pages/2_💼_Portfolio.py").run()
     assert not at.exception, f"unexpected exception: {at.exception}"

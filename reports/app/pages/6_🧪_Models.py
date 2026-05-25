@@ -1,4 +1,5 @@
 """Models — trigger fits and scoring from the UI; persist via model_run_log."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -164,12 +165,7 @@ st.markdown("---")
 st.subheader("Recent runs")
 try:
     with session_scope() as s:
-        rows = (
-            s.query(ModelRunLog)
-            .order_by(ModelRunLog.started_at.desc())
-            .limit(50)
-            .all()
-        )
+        rows = s.query(ModelRunLog).order_by(ModelRunLog.started_at.desc()).limit(50).all()
         if not rows:
             st.info("No runs yet.")
         else:

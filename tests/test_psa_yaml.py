@@ -9,9 +9,14 @@ def test_load_returns_list():
 def test_save_and_load_roundtrip(monkeypatch, tmp_path):
     fake = tmp_path / "psa_priority.yaml"
     monkeypatch.setattr(psa_yaml, "_YAML_PATH", fake)
-    psa_yaml.save_priority([{"card_id": 1, "psa_spec_id": "TBD"}, {"card_id": 2, "psa_spec_id": "S123"}])
+    psa_yaml.save_priority(
+        [{"card_id": 1, "psa_spec_id": "TBD"}, {"card_id": 2, "psa_spec_id": "S123"}]
+    )
     rows = psa_yaml.load_priority()
-    assert rows == [{"card_id": 1, "psa_spec_id": "TBD"}, {"card_id": 2, "psa_spec_id": "S123"}]
+    assert rows == [
+        {"card_id": 1, "psa_spec_id": "TBD"},
+        {"card_id": 2, "psa_spec_id": "S123"},
+    ]
 
 
 def test_cards_with_tbd(monkeypatch, tmp_path):
