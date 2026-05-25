@@ -68,3 +68,53 @@ def test_no_lookahead_future_score_excluded(session):
     assert bool(row["has_stardom_score"]) is False
     # missing premium fall back to cohort median = 0 when no peer has a score
     assert float(row["stardom_premium"]) == pytest.approx(0.0)
+
+
+# --- Hedonic v2 model tests ---
+
+from sportscards.factors.hedonic import MODEL_VERSION, fit, predict
+from sportscards.factors.synthetic_data import generate_synthetic_transactions
+
+
+def test_model_version_is_v2():
+    assert MODEL_VERSION == "hedonic_v2"
+
+
+def test_high_stardom_lifts_rookie_fitted_price(session):
+    import importlib.util
+    import pathlib
+    from sqlalchemy import select as _select
+    from sportscards.db.models import Card as _Card, PlayerStardomScore as _PSS, TxClean as _TC
+
+    _spec = importlib.util.spec_from_file_location(
+        "_test_hedonic_helper",
+        pathlib.Path(__file__).parent / "test_hedonic.py",
+    )
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    _mod._seed(session)
+    session.commit()
+    generate_synthetic_transactions(session, n_per_card=20, seed=11)
+    rookie_card = session.execute(
+        _select(_Card).where(_Card.is_rookie == True).limit(1)  # noqa: E712
+    ).scalar_one()
+    first_sale = session.execute(
+        _select(_TC.sold_at).where(_TC.card_id == rookie_card.card_id)
+        .order_by(_TC.sold_at).limit(1)
+    ).scalar_one()
+    session.add(_PSS(
+        player_id=rookie_card.player_id, model_version="prism_v1",
+        draft_year=2023, premium=Decimal("0.50"),
+        percentile_rank=Decimal("0.99"),
+        fit_at=first_sale,
+    ))
+    session.commit()
+
+    df = build_features(session)
+    model, enc, _ = fit(df, n_trials=4)
+    pred = predict(model, enc, df)
+    df = df.assign(pred=pred)
+    pid = rookie_card.player_id
+    star_mean = df.loc[(df.player_id == pid) & (df.is_rookie == 1), "pred"].mean()
+    other_mean = df.loc[(df.player_id != pid) & (df.is_rookie == 1), "pred"].mean()
+    assert star_mean > other_mean, (star_mean, other_mean)

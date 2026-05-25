@@ -292,6 +292,7 @@ def build_features(session: Session) -> pd.DataFrame:
         # identifiers
         "tx_id",
         "sold_at",
+        "player_id",
         # target
         "log_price",
         # numerical
