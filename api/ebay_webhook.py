@@ -18,7 +18,7 @@ class handler(BaseHTTPRequestHandler):
 
         # eBay spec: sha256(challengeCode + verificationToken + endpointUrl)
         host = self.headers.get("host", "")
-        endpoint_url = f"https://{host}/api/ebay-webhook"
+        endpoint_url = f"https://{host}/api/ebay_webhook"
         digest = hashlib.sha256(
             (challenge_code + VERIFICATION_TOKEN + endpoint_url).encode()
         ).hexdigest()

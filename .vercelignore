@@ -1,0 +1,25 @@
+# Hide the main Python project from Vercel auto-detection so it
+# treats this as a serverless-functions deployment (api/*.py only),
+# not a single Python ASGI app. The presence of pyproject.toml at the
+# repo root otherwise triggers the wrong mode and breaks the build.
+src/
+sql/
+tests/
+reports/
+docs/
+notebooks/
+data/
+letters/
+models/
+.worktrees/
+.github/
+pyproject.toml
+uv.lock
+alembic.ini
+docker-compose.yml
+Makefile
+prefect.yaml
+.pre-commit-config.yaml
+.env.example
+README.md
+CONTRIBUTING.md

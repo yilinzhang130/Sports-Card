@@ -3,7 +3,7 @@
   "outputDirectory": null,
   "installCommand": null,
   "functions": {
-    "api/ebay-webhook.py": {
+    "api/ebay_webhook.py": {
       "runtime": "python3.12"
     }
   }
