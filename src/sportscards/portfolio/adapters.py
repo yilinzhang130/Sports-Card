@@ -51,32 +51,84 @@ def load_anchors(session: Any, as_of: datetime | None = None) -> pd.DataFrame:
 
 
 def load_mispricing(session: Any, as_of: datetime) -> pd.DataFrame | None:
-    """Phase 2B output. Returns None if the table isn't there yet.
+    """Phase 2B output. Returns None if the table isn't there yet or has no
+    rows before ``as_of``.
 
-    Expected schema: ``card_id, mispricing_residual, computed_at, sport, parallel_tier``.
-    Raises if any row has ``computed_at >= as_of`` (look-ahead canary).
+    The physical ``tx_mispricing`` table stores one residual per
+    ``(tx_id, model_version)`` pair. Portfolio construction expects one row
+    per ``card_id`` with columns
+    ``(card_id, mispricing_residual, computed_at, sport, parallel_tier)``.
+    We derive that shape here:
+
+    * JOIN ``tx_mispricing → tx_clean → card_master``
+    * Use ``tx_clean.sold_at`` as ``computed_at`` (the point in time the
+      residual corresponds to — strictly less than ``as_of`` to avoid
+      look-ahead)
+    * Hardcode ``sport = 'NBA'`` (Phase 1 universe)
+    * Compute ``parallel_tier`` from ``card_master.parallel`` / ``print_run``
+      via :func:`sportscards.factors.features.parallel_tier`
+    * Collapse multiple residuals per card to the latest by ``sold_at``
+
+    Raises if any retained row has ``computed_at >= as_of``
+    (look-ahead canary; cannot happen given the WHERE clause but kept as a
+    defensive check).
     """
     if not _has_table(session, "tx_mispricing"):
         return None
-    from sqlalchemy import text
 
-    rows = (
-        session.execute(
-            text(
-                "SELECT card_id, mispricing_residual, computed_at, sport, parallel_tier "
-                "FROM tx_mispricing WHERE computed_at < :as_of"
-            ),
-            {"as_of": as_of},
+    from sportscards.db.models import Card, TxClean, TxMispricing
+    from sportscards.factors.features import parallel_tier
+
+    rows = session.execute(
+        select(
+            TxClean.card_id,
+            TxMispricing.residual,
+            TxClean.sold_at,
+            Card.parallel,
+            Card.print_run,
+            Card.is_one_of_one,
         )
-        .mappings()
-        .all()
-    )
+        .join(TxClean, TxMispricing.tx_id == TxClean.tx_id)
+        .join(Card, TxClean.card_id == Card.card_id)
+        .where(TxClean.sold_at < as_of)
+    ).all()
     if not rows:
         return None
-    df = pd.DataFrame(rows)
-    if "computed_at" in df.columns and (df["computed_at"] >= as_of).any():
+
+    records = []
+    for r in rows:
+        # Build a lightweight shim with the attributes parallel_tier() reads.
+        shim = type(
+            "C",
+            (),
+            {
+                "is_one_of_one": bool(r.is_one_of_one),
+                "print_run": r.print_run,
+                "parallel": r.parallel,
+            },
+        )()
+        records.append(
+            {
+                "card_id": r.card_id,
+                "mispricing_residual": float(r.residual),
+                "computed_at": r.sold_at,
+                "sport": "NBA",
+                "parallel_tier": parallel_tier(shim),
+            }
+        )
+    df = pd.DataFrame(records)
+    # Keep the most recent residual per card.
+    df = df.sort_values("computed_at").groupby("card_id", as_index=False).tail(1)
+    # Look-ahead canary — normalize tz so SQLite (naive) and Postgres (aware) both work.
+    ca = pd.to_datetime(df["computed_at"])
+    as_of_ts = pd.Timestamp(as_of)
+    if ca.dt.tz is None and as_of_ts.tz is not None:
+        as_of_ts = as_of_ts.tz_localize(None)
+    elif ca.dt.tz is not None and as_of_ts.tz is None:
+        as_of_ts = as_of_ts.tz_localize("UTC")
+    if (ca >= as_of_ts).any():
         raise RuntimeError("look-ahead detected in tx_mispricing")
-    return df
+    return df.reset_index(drop=True)
 
 
 def load_stardom(session: Any, as_of: datetime) -> pd.DataFrame | None:

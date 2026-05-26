@@ -92,6 +92,17 @@ def generate_synthetic_transactions(
     ext_counter = 0
 
     for card in cards:
+        # Build a per-card cert pool. ~30% of cert numbers appear twice so the
+        # repeat-sales regression sees actual resales; the remaining ~40% are
+        # unique. Deterministic per card+seed.
+        card_rng = random.Random(seed + card.card_id)
+        n_resold = max(1, int(n_per_card * 0.3))
+        resold_certs = [f"SYN-{card.card_id:06d}-R{i:03d}" for i in range(n_resold)]
+        fresh_certs = [f"SYN-{card.card_id:06d}-U{i:03d}" for i in range(n_per_card - n_resold)]
+        cert_pool = resold_certs * 2 + fresh_certs
+        card_rng.shuffle(cert_pool)
+        cert_pool = cert_pool[:n_per_card]
+
         tier = parallel_tier(card)
         is_rookie = 1.0 if card.is_rookie else 0.0
         has_auto = 1.0 if card.has_auto else 0.0
@@ -126,7 +137,7 @@ def generate_synthetic_transactions(
         psa10_pop_at_sale = _pop_for_card(card, 10, rng)
         log_pop_psa10 = math.log(max(1, psa10_pop_at_sale))
 
-        for _ in range(n_per_card):
+        for tx_idx in range(n_per_card):
             # Random grade: 70% PSA 10, 30% PSA 9
             grade = 10 if rng.random() < 0.7 else 9
             grade_10_premium = 1.0 if grade == 10 else 0.0
@@ -173,7 +184,7 @@ def generate_synthetic_transactions(
                 card_id=card.card_id,
                 slab_grader="PSA",
                 slab_grade=Decimal(str(grade)),
-                cert_number=None,
+                cert_number=cert_pool[tx_idx],
                 price_usd=Decimal(f"{price:.2f}"),
                 sold_at=sold_at,
                 fee_estimate=Decimal(f"{price * 0.13:.2f}"),

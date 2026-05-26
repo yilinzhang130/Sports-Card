@@ -3,6 +3,12 @@
 Rates default to the research-doc snapshot (eBay 13.25% + $0.30 per sale,
 Goldin/Heritage 20% buyer's premium, PSA Value Bulk $24.99 effective Feb 2026).
 All rates are configurable via :class:`FeeSchedule` because fees shift.
+
+Channel keys (``"ebay"``, ``"goldin"``, ...) are *fee-schedule labels*,
+not ``tx_raw.source`` values. ``"ebay"`` covers all eBay activity — both
+historical sold listings (``source='ebay'``) and Browse-API active
+listings (``source='ebay_active'``) — because the fee structure is the
+same for both.
 """
 
 from __future__ import annotations

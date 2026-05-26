@@ -22,6 +22,37 @@ pytest tests/
 make test
 ```
 
+The default suite runs against per-test SQLite databases (see
+`tests/conftest.py::migrated_db`) and does **not** exercise
+TimescaleDB-specific behavior (hypertable inserts, `ON CONFLICT ...
+RETURNING`, etc.).
+
+## Integration testing
+
+Tests marked `@pytest.mark.integration` run the full pipeline against a
+real Postgres + TimescaleDB instance. They cover schema-drift bugs,
+hypertable upsert semantics, and the end-to-end CLI flow.
+
+Prerequisite: the docker compose `db` service is running and migrations
+are applied:
+
+```bash
+docker compose up -d db
+uv run alembic upgrade head
+```
+
+Then opt in via `RUN_INTEGRATION=1`:
+
+```bash
+RUN_INTEGRATION=1 \
+  DATABASE_URL=postgresql+psycopg://sportscards:sportscards@localhost:5433/sportscards \
+  uv run pytest tests/test_integration_e2e.py tests/test_hypertable_upserts.py tests/test_seed_rowcount.py -v
+```
+
+The e2e test wipes transactional + master tables before running, so do
+not point it at a database whose data you want to keep. CI is expected
+to spin up a fresh compose stack per integration job.
+
 ## Pre-commit
 
 Install once per clone:

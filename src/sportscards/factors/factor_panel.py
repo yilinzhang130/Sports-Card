@@ -10,7 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pandas as pd
-from sqlalchemy import delete
+from sqlalchemy import delete, insert
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import FactorPanel
@@ -62,29 +62,37 @@ def persist_panel(
     if df.empty:
         return 0
 
-    # Replace existing rows for this as_of_date
+    # Replace existing rows for this as_of_date.
     session.execute(delete(FactorPanel).where(FactorPanel.as_of_date == as_of_ts.to_pydatetime()))
 
-    n = 0
+    # Build a list of dicts and bulk-insert via Core. We deliberately avoid
+    # the ORM unit-of-work flush path: SQLAlchemy's insertmanyvalues optimizer
+    # adds RETURNING with sentinel columns, and TimescaleDB's chunk-routing
+    # rewrites the insert so SA can't match returned rows back to inputs
+    # ("Can't match sentinel values in result set to parameter sets"). A plain
+    # Core INSERT is straightforward and Timescale-safe.
+    rows: list[dict[str, object]] = []
     for row in df.itertuples(index=False):
-        session.add(
-            FactorPanel(
-                card_id=int(row.card_id),
-                as_of_date=as_of_ts.to_pydatetime(),
-                r30=_dec(getattr(row, "r30", None)),
-                r90=_dec(getattr(row, "r90", None)),
-                r365=_dec(getattr(row, "r365", None)),
-                cs_momentum_pct=_dec(getattr(row, "cs_momentum_pct", None), q="0.0001"),
-                is_hyped=bool(getattr(row, "is_hyped", False)),
-                sales_count_90d=int(row.sales_count_90d),
-                dollar_volume_90d=_dec(row.dollar_volume_90d, q="0.01"),
-                bid_ask_proxy=_dec(row.bid_ask_proxy, q="0.00001"),
-                last_sale_recency_days=(
+        rows.append(
+            {
+                "card_id": int(row.card_id),
+                "as_of_date": as_of_ts.to_pydatetime(),
+                "r30": _dec(getattr(row, "r30", None)),
+                "r90": _dec(getattr(row, "r90", None)),
+                "r365": _dec(getattr(row, "r365", None)),
+                "cs_momentum_pct": _dec(getattr(row, "cs_momentum_pct", None), q="0.0001"),
+                "is_hyped": bool(getattr(row, "is_hyped", False)),
+                "sales_count_90d": int(row.sales_count_90d),
+                "dollar_volume_90d": _dec(row.dollar_volume_90d, q="0.01"),
+                "bid_ask_proxy": _dec(row.bid_ask_proxy, q="0.00001"),
+                "last_sale_recency_days": (
                     None if pd.isna(row.last_sale_recency_days) else int(row.last_sale_recency_days)
                 ),
-                liquidity_tier=str(row.liquidity_tier),
-            )
+                "liquidity_tier": str(row.liquidity_tier),
+            }
         )
-        n += 1
+    if not rows:
+        return 0
+    session.execute(insert(FactorPanel), rows)
     session.flush()
-    return n
+    return len(rows)
