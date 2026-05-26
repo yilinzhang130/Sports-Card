@@ -13,9 +13,9 @@ letters/
 models/
 .worktrees/
 .github/
-pyproject.toml
-uv.lock
-alembic.ini
+/pyproject.toml
+/uv.lock
+/alembic.ini
 docker-compose.yml
 Makefile
 prefect.yaml
