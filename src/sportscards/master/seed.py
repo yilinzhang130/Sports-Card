@@ -25,11 +25,15 @@ def seed_players(path: Path | None = None) -> int:
     with session_scope() as s:
         for row in data:
             stmt = (
-                pg_insert(Player).values(**row).on_conflict_do_nothing(index_elements=["br_slug"])
+                pg_insert(Player)
+                .values(**row)
+                .on_conflict_do_nothing(index_elements=["br_slug"])
+                .returning(Player.player_id)
             )
+            # rowcount is unreliable for ON CONFLICT DO NOTHING (psycopg returns -1
+            # even on insert); RETURNING gives us the actual inserted rows.
             res = s.execute(stmt)
-            # psycopg returns -1 for ON CONFLICT DO NOTHING when nothing inserted
-            added += max(res.rowcount or 0, 0)  # type: ignore[attr-defined]
+            added += len(res.all())
     log.info("seeded %d players", added)
     return added
 
@@ -54,9 +58,9 @@ def seed_cards(path: Path | None = None) -> int:
                 pg_insert(Card)
                 .values(**row)
                 .on_conflict_do_nothing(constraint="uq_card_master_identity")
+                .returning(Card.card_id)
             )
             res = s.execute(stmt)
-            # psycopg returns -1 for ON CONFLICT DO NOTHING when nothing inserted
-            added += max(res.rowcount or 0, 0)  # type: ignore[attr-defined]
+            added += len(res.all())
     log.info("seeded %d cards", added)
     return added
