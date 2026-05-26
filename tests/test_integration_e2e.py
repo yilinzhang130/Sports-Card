@@ -11,7 +11,7 @@ compose ``db`` service is running and DATABASE_URL points at it.
 from __future__ import annotations
 
 import os
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import delete, func, select

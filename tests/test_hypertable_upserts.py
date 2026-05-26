@@ -11,7 +11,7 @@ Postgres-only (set RUN_INTEGRATION=1).
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -44,7 +44,7 @@ def test_factor_panel_bulk_insert_no_sentinel_mismatch(pg_session):
     from sportscards.factors.factor_panel import _dec
 
     sess_mod = pg_session
-    as_of = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    as_of = datetime(2030, 1, 1, tzinfo=UTC)
 
     # Clean up + seed
     with sess_mod.session_scope() as s:
@@ -73,7 +73,6 @@ def test_factor_panel_bulk_insert_no_sentinel_mismatch(pg_session):
 
     # Now exercise the actual persist path. We bypass build_panel and use a
     # synthetic frame to isolate the upsert behavior.
-    import pandas as pd
     from sqlalchemy import insert
 
     rows = [
@@ -126,7 +125,7 @@ def test_repeat_sales_index_bulk_upsert(pg_session):
     bucket = "weekly"
     grade_tier = "TEST"
     era = "modern"
-    base = datetime(2030, 1, 7, tzinfo=timezone.utc)
+    base = datetime(2030, 1, 7, tzinfo=UTC)
     rows = [
         {
             "period_start": base + timedelta(days=7 * i),

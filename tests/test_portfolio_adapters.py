@@ -9,7 +9,7 @@ shape that portfolio.construction expects.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -77,7 +77,7 @@ def _make_tx(s, card, price, sold_at, raw_ext_id):
 
 
 def test_load_mispricing_joins_real_schema(migrated_db):
-    as_of = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    as_of = datetime(2026, 1, 15, tzinfo=UTC)
     with session_scope() as s:
         base_card, rare_card = _seed(s)
         tx1 = _make_tx(s, base_card, 100.0, as_of - timedelta(days=10), "x1")
@@ -122,7 +122,7 @@ def test_load_mispricing_joins_real_schema(migrated_db):
 
 
 def test_load_mispricing_takes_latest_per_card(migrated_db):
-    as_of = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    as_of = datetime(2026, 1, 15, tzinfo=UTC)
     with session_scope() as s:
         base_card, _ = _seed(s)
         tx_old = _make_tx(s, base_card, 90.0, as_of - timedelta(days=20), "old")
@@ -152,7 +152,7 @@ def test_load_mispricing_takes_latest_per_card(migrated_db):
 
 
 def test_load_mispricing_excludes_post_as_of_sales(migrated_db):
-    as_of = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    as_of = datetime(2026, 1, 15, tzinfo=UTC)
     with session_scope() as s:
         base_card, _ = _seed(s)
         tx_future = _make_tx(s, base_card, 110.0, as_of + timedelta(days=1), "future")
@@ -173,7 +173,7 @@ def test_load_mispricing_excludes_post_as_of_sales(migrated_db):
 
 def test_load_mispricing_returns_none_when_table_missing(migrated_db):
     # tx_mispricing table exists per migrations but has no rows
-    as_of = datetime(2026, 1, 15, tzinfo=timezone.utc)
+    as_of = datetime(2026, 1, 15, tzinfo=UTC)
     with session_scope() as s:
         df = load_mispricing(s, as_of)
     assert df is None
