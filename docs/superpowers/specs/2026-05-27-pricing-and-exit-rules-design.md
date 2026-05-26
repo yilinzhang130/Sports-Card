@@ -193,7 +193,7 @@ def persist_targets_for_panel(
 # pricing/exit_rules.py
 @dataclass(frozen=True)
 class ExitSignal:
-    position_id: int
+    holding_id: int
     rule_triggered: Literal[
         "target_hit", "factor_reversal", "time_stop",
         "price_stop", "liquidity_degrade",
@@ -233,39 +233,37 @@ New table `exit_signal`:
 ```sql
 CREATE TABLE exit_signal (
     id                 BIGSERIAL PRIMARY KEY,
-    position_id        BIGINT NOT NULL REFERENCES position(id),
+    holding_id         BIGINT NOT NULL REFERENCES portfolio_holdings(holding_id),
     rule_triggered     TEXT   NOT NULL,
     recommended_action TEXT   NOT NULL,
     as_of_date         DATE   NOT NULL,
     notes              TEXT,
     resolved_at        TIMESTAMPTZ,
-    UNIQUE (position_id, rule_triggered, as_of_date)
+    UNIQUE (holding_id, rule_triggered, as_of_date)
 );
+CREATE INDEX ix_exit_signal_unresolved ON exit_signal(resolved_at) WHERE resolved_at IS NULL;
 ```
 
-No `position` table exists today (the `position` field on `player` is the
-basketball court position, unrelated). This spec creates a minimal
-holdings table sufficient for exit-rule evaluation:
+A holdings table already exists from migration 0010:
+`portfolio_holdings(holding_id, card_id, cert_number, slab_grader,
+slab_grade, acquired_at, acquired_cost_usd, channel, status, sold_at,
+sold_proceeds_usd)`. We extend it with two columns needed for the
+factor-reversal and liquidity-degrade exit rules:
 
 ```sql
-CREATE TABLE position (
-    id                     BIGSERIAL PRIMARY KEY,
-    card_id                BIGINT      NOT NULL,
-    entry_date             DATE        NOT NULL,
-    entry_price            NUMERIC(12,2) NOT NULL,
-    qty                    INT         NOT NULL DEFAULT 1,
-    entry_factor_decile    SMALLINT,
-    entry_liquidity_tier   CHAR(1),
-    status                 TEXT        NOT NULL DEFAULT 'open',
-                                       -- 'open' | 'closed' | 'partial'
-    closed_date            DATE,
-    closed_price           NUMERIC(12,2)
-);
-CREATE INDEX ix_position_status_card ON position(status, card_id);
+ALTER TABLE portfolio_holdings
+    ADD COLUMN entry_factor_decile  SMALLINT,
+    ADD COLUMN entry_liquidity_tier CHAR(1);
 ```
 
-Manual entry initially (trader records fills after the fact); automated
-wiring from order execution is deferred.
+`exit_signal.position_id` therefore references
+`portfolio_holdings(holding_id)`. Rename accordingly throughout this
+spec: read `position` as `portfolio_holdings`, `position_id` as
+`holding_id`.
+
+Entries are recorded manually by the trader after a fill (this matches
+the existing Trader Console flow); automated wiring from order
+execution is deferred.
 
 ## Flow integration
 
