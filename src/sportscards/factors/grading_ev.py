@@ -4,6 +4,12 @@ EV = gem_rate × P10_net + (1 − gem_rate) × P9_net − cost_to_grade − raw_
 
 Task 5 scope: gem-rate estimator + trend adjustment. The full EV
 computation (compute_grading_ev / rank_grading_candidates) lands in Task 6.
+
+Note: ``"ebay"`` here and in the related ``transaction_costs`` /
+``walk_forward`` modules is a *channel / fee-schedule key*, not a
+``tx_raw.source`` filter. It applies to both ``source='ebay'`` (historical
+sold listings) and ``source='ebay_active'`` (active listings from the
+Browse API — used since Marketplace Insights access isn't approved).
 """
 
 from __future__ import annotations

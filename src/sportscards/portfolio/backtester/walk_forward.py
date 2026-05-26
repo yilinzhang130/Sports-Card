@@ -7,7 +7,8 @@ Design choices (per Phase 4 spec):
   ``min(target_delta, weekly_turnover_pct_cap × 90d sales count)`` measured
   in card units. Partial fills carry to the next week.
 - Fees deducted via :mod:`sportscards.portfolio.transaction_costs` on every
-  buy and sell.
+  buy and sell. The default channel ``"ebay"`` is a fee-schedule key — it
+  applies to both ``source='ebay'`` and ``source='ebay_active'`` listings.
 - NAV marked daily using last-observation-carried-forward VWAP (cards are
   illiquid; many days have no sales).
 
