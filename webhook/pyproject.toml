@@ -1,0 +1,9 @@
+[project]
+name = "sportscards-ebay-webhook"
+version = "0.1.0"
+description = "Minimal eBay marketplace account deletion webhook for Vercel"
+requires-python = ">=3.12"
+dependencies = []  # webhook uses stdlib only
+
+[tool.vercel]
+entrypoint = "api.ebay_webhook:handler"
