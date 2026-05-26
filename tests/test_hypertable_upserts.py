@@ -109,6 +109,88 @@ def test_factor_panel_bulk_insert_no_sentinel_mismatch(pg_session):
         s.execute(delete(Player).where(Player.br_slug == "hyper-test-player"))
 
 
+def test_repeat_sales_index_bulk_upsert(pg_session):
+    """Confirm the existing pg_insert + on_conflict_do_update path for the
+    repeat_sales_index hypertable handles a 50-row bulk upsert.
+
+    No code change is required for this path (no server-default columns =>
+    no RETURNING sentinel issue), but we lock the behavior in so a future
+    refactor that introduces a server default won't silently break it.
+    """
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from sportscards.db.models import RepeatSalesIndex
+
+    sess_mod = pg_session
+    sport = "ZZZ"
+    bucket = "weekly"
+    grade_tier = "TEST"
+    era = "modern"
+    base = datetime(2030, 1, 7, tzinfo=timezone.utc)
+    rows = [
+        {
+            "period_start": base + timedelta(days=7 * i),
+            "sport": sport,
+            "bucket": bucket,
+            "grade_tier": grade_tier,
+            "era": era,
+            "index_value": Decimal(f"{1.0 + i * 0.01:.4f}"),
+            "n_pairs": i + 1,
+            "se": Decimal("0.10000"),
+        }
+        for i in range(50)
+    ]
+
+    with sess_mod.session_scope() as s:
+        from sqlalchemy import and_, delete
+
+        s.execute(
+            delete(RepeatSalesIndex).where(
+                and_(
+                    RepeatSalesIndex.sport == sport,
+                    RepeatSalesIndex.bucket == bucket,
+                    RepeatSalesIndex.grade_tier == grade_tier,
+                    RepeatSalesIndex.era == era,
+                )
+            )
+        )
+
+    with sess_mod.session_scope() as s:
+        stmt = pg_insert(RepeatSalesIndex).values(rows)
+        update_cols = {
+            c.name: stmt.excluded[c.name]
+            for c in RepeatSalesIndex.__table__.columns
+            if not c.primary_key
+        }
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["period_start", "sport", "bucket", "grade_tier", "era"],
+            set_=update_cols,
+        )
+        s.execute(stmt)
+
+    with sess_mod.session_scope() as s:
+        n = s.execute(
+            select(func.count())
+            .select_from(RepeatSalesIndex)
+            .where(RepeatSalesIndex.sport == sport)
+        ).scalar_one()
+    assert n == 50
+
+    with sess_mod.session_scope() as s:
+        from sqlalchemy import and_, delete
+
+        s.execute(
+            delete(RepeatSalesIndex).where(
+                and_(
+                    RepeatSalesIndex.sport == sport,
+                    RepeatSalesIndex.bucket == bucket,
+                    RepeatSalesIndex.grade_tier == grade_tier,
+                    RepeatSalesIndex.era == era,
+                )
+            )
+        )
+
+
 def test_persist_panel_end_to_end_against_timescale(pg_session):
     """End-to-end: persist_panel against TimescaleDB returns >0 and inserts rows.
 
