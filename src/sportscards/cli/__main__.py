@@ -912,13 +912,19 @@ def events_refresh_transactions_cmd(since_days: int) -> None:
 
 @cli.command("dashboard")
 def dashboard_cmd() -> None:
-    """Launch the Streamlit dashboard."""
+    """Launch the Streamlit dashboard (Trader Console)."""
+    import os
     import subprocess
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[3]
     app = repo_root / "reports" / "app" / "Home.py"
-    subprocess.run(["streamlit", "run", str(app)], check=False)
+    # The multi-page app imports `reports.app._components.*`, which means the
+    # repo root must be on PYTHONPATH so `reports` resolves as a top-level
+    # package. Streamlit doesn't add it automatically.
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(repo_root), env.get("PYTHONPATH", "")]))
+    subprocess.run(["streamlit", "run", str(app)], env=env, check=False)
 
 
 @cli.command("letter")
