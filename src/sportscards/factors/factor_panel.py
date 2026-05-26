@@ -86,9 +86,7 @@ def persist_panel(
                 "dollar_volume_90d": _dec(row.dollar_volume_90d, q="0.01"),
                 "bid_ask_proxy": _dec(row.bid_ask_proxy, q="0.00001"),
                 "last_sale_recency_days": (
-                    None
-                    if pd.isna(row.last_sale_recency_days)
-                    else int(row.last_sale_recency_days)
+                    None if pd.isna(row.last_sale_recency_days) else int(row.last_sale_recency_days)
                 ),
                 "liquidity_tier": str(row.liquidity_tier),
             }

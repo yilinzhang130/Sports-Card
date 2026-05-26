@@ -98,9 +98,7 @@ def generate_synthetic_transactions(
         card_rng = random.Random(seed + card.card_id)
         n_resold = max(1, int(n_per_card * 0.3))
         resold_certs = [f"SYN-{card.card_id:06d}-R{i:03d}" for i in range(n_resold)]
-        fresh_certs = [
-            f"SYN-{card.card_id:06d}-U{i:03d}" for i in range(n_per_card - n_resold)
-        ]
+        fresh_certs = [f"SYN-{card.card_id:06d}-U{i:03d}" for i in range(n_per_card - n_resold)]
         cert_pool = resold_certs * 2 + fresh_certs
         card_rng.shuffle(cert_pool)
         cert_pool = cert_pool[:n_per_card]
