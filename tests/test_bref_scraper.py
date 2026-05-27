@@ -7,12 +7,10 @@ monkey-patched so no test touches the network.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from unittest.mock import patch
 
 import httpx
-import pandas as pd
 import pytest
 
 from sportscards.scouting.nba import _bref_scraper
