@@ -32,10 +32,11 @@ import re
 import time
 import urllib.parse
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pandas as pd
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -121,12 +122,32 @@ def _strip_html_comments(html: str) -> str:
     return re.sub(r"<!--|-->", "", html)
 
 
-def _cell_text(row, data_stat: str) -> str | None:
+def _cell_text(row: Tag, data_stat: str) -> str | None:
     cell = row.find(attrs={"data-stat": data_stat})
     if cell is None:
         return None
     text = cell.get_text(strip=True)
     return text or None
+
+
+def _attr_str(tag: Any, key: str, default: str = "") -> str:
+    """Coerce a BS4 attribute (which may be ``str | list[str] | None``) to ``str``."""
+    val = tag.get(key, default) if tag is not None else default
+    if val is None:
+        return default
+    if isinstance(val, list):
+        return " ".join(val)
+    return str(val)
+
+
+def _attr_classes(tag: Any) -> list[str]:
+    """BS4 returns ``class`` as ``list[str] | None``; normalize to ``list[str]``."""
+    val = tag.get("class") if tag is not None else None
+    if val is None:
+        return []
+    if isinstance(val, str):
+        return [val]
+    return list(val)
 
 
 def fetch_draft_class(year: int, refresh: bool = False) -> pd.DataFrame:
@@ -145,33 +166,38 @@ def fetch_draft_class(year: int, refresh: bool = False) -> pd.DataFrame:
         logger.warning("no #stats table on %s — returning empty frame", url)
         return pd.DataFrame(columns=["br_slug", "name", "draft_pick", "draft_year"])
 
-    tbody = table.find("tbody")
-    rows = tbody.find_all("tr") if tbody else []
+    tbody = table.find("tbody") if isinstance(table, Tag) else None
+    rows: list[Tag] = (
+        [r for r in tbody.find_all("tr") if isinstance(r, Tag)] if isinstance(tbody, Tag) else []
+    )
     records: list[dict[str, object]] = []
     for row in rows:
-        classes = row.get("class") or []
+        classes = _attr_classes(row)
         if "thead" in classes or "over_header" in classes:
             continue
-        anchor = row.find("td", attrs={"data-stat": "player"})
-        anchor = anchor.find("a") if anchor else None
-        if anchor is None:
+        player_td = row.find("td", attrs={"data-stat": "player"})
+        anchor = player_td.find("a") if isinstance(player_td, Tag) else None
+        if not isinstance(anchor, Tag):
             continue
-        slug_match = _SLUG_FROM_HREF.search(anchor.get("href", ""))
+        slug_match = _SLUG_FROM_HREF.search(_attr_str(anchor, "href"))
         if slug_match is None:
             continue
 
+        pick_text = _cell_text(row, "pick_overall")
         rec: dict[str, object] = {
             "br_slug": slug_match.group(1),
             "name": anchor.get_text(strip=True),
-            "draft_pick": pd.to_numeric(_cell_text(row, "pick_overall"), errors="coerce"),
+            "draft_pick": pd.to_numeric(pick_text, errors="coerce") if pick_text else pd.NA,
             "draft_year": year,
         }
         # Pass through any other cells BR provides on the draft page. The
         # downstream _normalize_prospects helper only reads a fixed
         # subset; extras are harmless.
         for cell in row.find_all(["td", "th"]):
-            ds = cell.get("data-stat")
-            if ds in (None, "player", "pick_overall", "ranker") or ds in rec:
+            if not isinstance(cell, Tag):
+                continue
+            ds = _attr_str(cell, "data-stat")
+            if ds in ("", "player", "pick_overall", "ranker") or ds in rec:
                 continue
             text = cell.get_text(strip=True) or None
             if text is None:
@@ -185,7 +211,8 @@ def fetch_draft_class(year: int, refresh: bool = False) -> pd.DataFrame:
         records.append(rec)
 
     df = pd.DataFrame(records)
-    df["draft_pick"] = pd.to_numeric(df.get("draft_pick"), errors="coerce")
+    if "draft_pick" in df.columns:
+        df["draft_pick"] = pd.to_numeric(df["draft_pick"], errors="coerce")
     return df
 
 
@@ -209,12 +236,15 @@ def _parse_advanced_table(html: str, max_seasons: int) -> pd.DataFrame:
     """
     soup = BeautifulSoup(_strip_html_comments(html), "lxml")
     table = soup.find("table", id="advanced")
-    if table is None or table.find("tbody") is None:
+    tbody = table.find("tbody") if isinstance(table, Tag) else None
+    if not isinstance(tbody, Tag):
         return pd.DataFrame(columns=["BPM", "WS", "VORP"])
 
     records: list[dict[str, object]] = []
-    for row in table.find("tbody").find_all("tr"):
-        classes = row.get("class") or []
+    for row in tbody.find_all("tr"):
+        if not isinstance(row, Tag):
+            continue
+        classes = _attr_classes(row)
         if "thead" in classes or "over_header" in classes:
             continue
         if "partial_table" in classes:
@@ -222,7 +252,9 @@ def _parse_advanced_table(html: str, max_seasons: int) -> pd.DataFrame:
             continue
         rec: dict[str, object] = {}
         for cell in row.find_all(["td", "th"]):
-            ds = cell.get("data-stat")
+            if not isinstance(cell, Tag):
+                continue
+            ds = _attr_str(cell, "data-stat")
             if not ds:
                 continue
             text = cell.get_text(strip=True) or None

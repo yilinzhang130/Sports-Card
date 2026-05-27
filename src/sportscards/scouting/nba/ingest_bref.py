@@ -309,8 +309,8 @@ def _upsert_prospects_to_master(prospects: pd.DataFrame) -> int:
             "name": str(r.name),
             "br_slug": str(r.br_slug),
             "position": (str(r.position) if pd.notna(r.position) else None),
-            "draft_year": int(r.draft_year) if pd.notna(r.draft_year) else None,
-            "draft_pick": int(r.draft_pick) if pd.notna(r.draft_pick) else None,
+            "draft_year": int(float(str(r.draft_year))) if pd.notna(r.draft_year) else None,
+            "draft_pick": int(float(str(r.draft_pick))) if pd.notna(r.draft_pick) else None,
         }
         for r in prospects.dropna(subset=["br_slug", "name"]).itertuples(index=False)
     ]
