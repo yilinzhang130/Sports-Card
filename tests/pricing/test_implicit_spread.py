@@ -52,8 +52,28 @@ def test_positive_spread_with_noisy_prices():
 def test_negative_alpha_clipped_to_zero():
     # Construct prices so that for several pairs γ > 2β (yields negative α).
     # Estimator must clip to 0 rather than producing imaginary spread.
-    prices = [100, 100, 100, 100, 100, 200, 200, 100, 100, 100,
-              100, 100, 200, 100, 100, 100, 100, 100, 100, 100]
+    prices = [
+        100,
+        100,
+        100,
+        100,
+        100,
+        200,
+        200,
+        100,
+        100,
+        100,
+        100,
+        100,
+        200,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+    ]
     df = _sold(prices)
     out = estimate_half_spread(df, liquidity_tier="A")
     assert out >= 0.0

@@ -416,9 +416,7 @@ class TradeTargets(Base):
 
     __tablename__ = "trade_targets"
 
-    card_id: Mapped[int] = mapped_column(
-        ForeignKey("card_master.card_id"), primary_key=True
-    )
+    card_id: Mapped[int] = mapped_column(ForeignKey("card_master.card_id"), primary_key=True)
     as_of_date: Mapped[date] = mapped_column(Date, primary_key=True)
     fair_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     bid_max: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -450,7 +448,9 @@ class ExitSignal(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "holding_id", "rule_triggered", "as_of_date",
+            "holding_id",
+            "rule_triggered",
+            "as_of_date",
             name="uq_exit_signal_holding_rule_day",
         ),
     )

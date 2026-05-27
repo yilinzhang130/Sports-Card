@@ -19,6 +19,7 @@ from sportscards.pricing.targets import persist_targets_for_panel
 def pricing_refresh_flow(as_of: date | None = None) -> dict[str, int]:
     if as_of is None:
         from datetime import UTC, datetime
+
         as_of = datetime.now(tz=UTC).date()
     log = get_run_logger()
 

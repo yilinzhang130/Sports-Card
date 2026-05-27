@@ -12,7 +12,7 @@ from sportscards.pricing.fair_value import (
 
 def test_recency_confidence_decays_exponentially():
     assert recency_confidence(0) == pytest.approx(1.0)
-    assert recency_confidence(TAU_DAYS) == pytest.approx(math.e ** -1)
+    assert recency_confidence(TAU_DAYS) == pytest.approx(math.e**-1)
     assert recency_confidence(3 * TAU_DAYS) < 0.05
 
 

@@ -60,7 +60,9 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text),
         sa.Column("resolved_at", sa.DateTime(timezone=True)),
         sa.UniqueConstraint(
-            "holding_id", "rule_triggered", "as_of_date",
+            "holding_id",
+            "rule_triggered",
+            "as_of_date",
             name="uq_exit_signal_holding_rule_day",
         ),
     )

@@ -72,6 +72,7 @@ def derive_targets(
 def _factor_zscore_lookup(session: Session, as_of: date) -> dict[int, float]:
     """Cross-sectional z-score of cs_momentum_pct over the as_of panel."""
     from datetime import datetime
+
     as_of_ts = datetime.combine(as_of, datetime.min.time())
     rows = session.execute(
         select(FactorPanel.card_id, FactorPanel.cs_momentum_pct).where(
@@ -102,6 +103,7 @@ def _sold_history(session: Session, card_id: int, as_of: date) -> pd.DataFrame:
 
 def _liquidity_tier(session: Session, card_id: int, as_of: date) -> str:
     from datetime import datetime
+
     as_of_ts = datetime.combine(as_of, datetime.min.time())
     row = session.execute(
         select(FactorPanel.liquidity_tier).where(
@@ -120,21 +122,15 @@ def _hedonic_predicted_lookup(session: Session, as_of: date) -> dict[int, float]
     return {}
 
 
-def compute_for_card(
-    session: Session, card_id: int, as_of: date
-) -> TradeTargetsValues | None:
+def compute_for_card(session: Session, card_id: int, as_of: date) -> TradeTargetsValues | None:
     """End-to-end pricing for one card. Returns None when fair value is
     undefined (no sold history and no hedonic prediction)."""
     hedonic_lookup = _hedonic_predicted_lookup(session, as_of)
-    fv = compute_fair_value(
-        session, card_id, as_of, hedonic_predicted=hedonic_lookup.get(card_id)
-    )
+    fv = compute_fair_value(session, card_id, as_of, hedonic_predicted=hedonic_lookup.get(card_id))
     if fv.fair_value is None:
         return None
     tier = _liquidity_tier(session, card_id, as_of)
-    half_spread = estimate_half_spread(
-        _sold_history(session, card_id, as_of), liquidity_tier=tier
-    )
+    half_spread = estimate_half_spread(_sold_history(session, card_id, as_of), liquidity_tier=tier)
     z = _factor_zscore_lookup(session, as_of).get(card_id, 0.0)
     return derive_targets(
         fair_value=fv.fair_value,
@@ -151,6 +147,7 @@ def persist_targets_for_panel(session: Session, as_of: date) -> int:
     """Compute and upsert trade_targets for every card in the as_of factor
     panel. Returns the number of rows written."""
     from datetime import datetime
+
     as_of_ts = datetime.combine(as_of, datetime.min.time())
     card_rows = session.execute(
         select(FactorPanel.card_id).where(FactorPanel.as_of_date == as_of_ts)

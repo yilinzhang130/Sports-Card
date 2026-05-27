@@ -42,34 +42,49 @@ def _add_last_sold(s, card_id, price, when):
     )
     s.add(raw)
     s.flush()
-    s.add(TxClean(
-        raw_id=raw.raw_id, card_id=card_id, price_usd=Decimal(str(price)),
-        sold_at=when, parser_confidence=Decimal("0.9"), parser_method="rule",
-    ))
+    s.add(
+        TxClean(
+            raw_id=raw.raw_id,
+            card_id=card_id,
+            price_usd=Decimal(str(price)),
+            sold_at=when,
+            parser_confidence=Decimal("0.9"),
+            parser_method="rule",
+        )
+    )
     s.flush()
 
 
 def _add_targets(s, card_id, as_of, **prices):
-    s.add(TradeTargets(
-        card_id=card_id, as_of_date=as_of,
-        fair_value=Decimal(str(prices.get("fair", 100))),
-        bid_max=Decimal(str(prices.get("bid_max", 90))),
-        sell_target=Decimal(str(prices.get("sell_target", 115))),
-        stop_loss=Decimal(str(prices.get("stop_loss", 80))),
-        confidence=Decimal("0.9"),
-        half_spread_pct=Decimal("0.025"),
-        liquidity_margin_pct=Decimal("0.05"),
-    ))
+    s.add(
+        TradeTargets(
+            card_id=card_id,
+            as_of_date=as_of,
+            fair_value=Decimal(str(prices.get("fair", 100))),
+            bid_max=Decimal(str(prices.get("bid_max", 90))),
+            sell_target=Decimal(str(prices.get("sell_target", 115))),
+            stop_loss=Decimal(str(prices.get("stop_loss", 80))),
+            confidence=Decimal("0.9"),
+            half_spread_pct=Decimal("0.025"),
+            liquidity_margin_pct=Decimal("0.05"),
+        )
+    )
     s.flush()
 
 
 def _add_panel(s, card_id, as_of, **kwargs):
     defaults = dict(
-        card_id=card_id, as_of_date=datetime.combine(as_of, datetime.min.time()),
-        r30=Decimal("0"), r90=Decimal("0"), r365=Decimal("0"),
-        cs_momentum_pct=Decimal("0.5"), is_hyped=False,
-        sales_count_90d=10, dollar_volume_90d=Decimal("1000"),
-        bid_ask_proxy=Decimal("0.05"), last_sale_recency_days=5,
+        card_id=card_id,
+        as_of_date=datetime.combine(as_of, datetime.min.time()),
+        r30=Decimal("0"),
+        r90=Decimal("0"),
+        r365=Decimal("0"),
+        cs_momentum_pct=Decimal("0.5"),
+        is_hyped=False,
+        sales_count_90d=10,
+        dollar_volume_90d=Decimal("1000"),
+        bid_ask_proxy=Decimal("0.05"),
+        last_sale_recency_days=5,
         liquidity_tier="A",
     )
     defaults.update(kwargs)
@@ -102,11 +117,18 @@ def test_rule_factor_reversal_when_dropped_out_of_decile(seeded_card_and_index):
         _add_panel(s, card_id, as_of, cs_momentum_pct=Decimal("0.05"))
         # Seed a second card with high momentum so the test card ranks below top decile
         from sportscards.db.models import Card, Player
+
         p2 = Player(name="Other Player")
         s.add(p2)
         s.flush()
-        c2 = Card(year=2018, manufacturer="Panini", set_name="Prizm",
-                  player_id=p2.player_id, card_number="9", parallel="Base")
+        c2 = Card(
+            year=2018,
+            manufacturer="Panini",
+            set_name="Prizm",
+            player_id=p2.player_id,
+            card_number="9",
+            parallel="Base",
+        )
         s.add(c2)
         s.flush()
         _add_panel(s, c2.card_id, as_of, cs_momentum_pct=Decimal("0.99"))
@@ -121,7 +143,8 @@ def test_rule_time_stop_after_540_days_no_gain(seeded_card_and_index):
     as_of = date(2026, 5, 27)
     with session_scope() as s:
         _make_holding(
-            s, card_id,
+            s,
+            card_id,
             acquired_at=datetime(2024, 1, 1, tzinfo=UTC),
             acquired_cost_usd=Decimal("100"),
         )
@@ -173,7 +196,9 @@ def test_unique_constraint_dedupes_reruns(seeded_card_and_index):
         _add_panel(s, card_id, as_of)
         evaluate_open_positions(s, as_of)
         evaluate_open_positions(s, as_of)
-        rows = s.execute(
-            select(ExitSignal).where(ExitSignal.rule_triggered == "target_hit")
-        ).scalars().all()
+        rows = (
+            s.execute(select(ExitSignal).where(ExitSignal.rule_triggered == "target_hit"))
+            .scalars()
+            .all()
+        )
     assert len(rows) == 1

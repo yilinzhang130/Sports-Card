@@ -170,7 +170,8 @@ def _index_pair(
         log.debug(
             "_index_pair: ts_then=%s predates earliest index period; "
             "using earliest value %s as fallback",
-            ts_then, earliest,
+            ts_then,
+            earliest,
         )
         then_val = earliest
     else:

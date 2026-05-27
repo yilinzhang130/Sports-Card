@@ -142,11 +142,11 @@ def seeded_panel_with_pricing_inputs(seeded_card_and_index):
         (now - timedelta(days=d), price)
         for d, price in [
             (2, Decimal("90")),
-            (2, Decimal("110")),   # day-2: H=110, L=90
+            (2, Decimal("110")),  # day-2: H=110, L=90
             (3, Decimal("92")),
-            (3, Decimal("108")),   # day-3: H=108, L=92
+            (3, Decimal("108")),  # day-3: H=108, L=92
             (4, Decimal("94")),
-            (4, Decimal("106")),   # day-4: H=106, L=94
+            (4, Decimal("106")),  # day-4: H=106, L=94
         ]
     ]
     with session_scope() as s:
@@ -196,36 +196,57 @@ def seeded_card_predating_index():
         s.add(p)
         s.flush()
         c = Card(
-            year=2018, manufacturer="Panini", set_name="Prizm",
-            player_id=p.player_id, card_number="42", parallel="Base",
+            year=2018,
+            manufacturer="Panini",
+            set_name="Prizm",
+            player_id=p.player_id,
+            card_number="42",
+            parallel="Base",
         )
         s.add(c)
         s.flush()
         now = datetime(2026, 5, 27, tzinfo=UTC)
-        s.add_all([
-            RepeatSalesIndex(
-                sport="NBA", era="modern", bucket="weekly", grade_tier="PSA10",
-                period_start=now - timedelta(days=50), index_value=Decimal("100"),
-                n_pairs=0,
-            ),
-            RepeatSalesIndex(
-                sport="NBA", era="modern", bucket="weekly", grade_tier="PSA10",
-                period_start=now, index_value=Decimal("120"),
-                n_pairs=0,
-            ),
-        ])
+        s.add_all(
+            [
+                RepeatSalesIndex(
+                    sport="NBA",
+                    era="modern",
+                    bucket="weekly",
+                    grade_tier="PSA10",
+                    period_start=now - timedelta(days=50),
+                    index_value=Decimal("100"),
+                    n_pairs=0,
+                ),
+                RepeatSalesIndex(
+                    sport="NBA",
+                    era="modern",
+                    bucket="weekly",
+                    grade_tier="PSA10",
+                    period_start=now,
+                    index_value=Decimal("120"),
+                    n_pairs=0,
+                ),
+            ]
+        )
         raw = TxRaw(
-            source="ebay", external_id="predating-1",
-            raw_json={}, raw_title="Predating Sale",
+            source="ebay",
+            external_id="predating-1",
+            raw_json={},
+            raw_title="Predating Sale",
         )
         s.add(raw)
         s.flush()
-        s.add(TxClean(
-            raw_id=raw.raw_id, card_id=c.card_id,
-            price_usd=Decimal("50"),
-            sold_at=now - timedelta(days=80),  # within 90d window but before earliest index (50d)
-            parser_confidence=Decimal("0.9"), parser_method="rule",
-        ))
+        s.add(
+            TxClean(
+                raw_id=raw.raw_id,
+                card_id=c.card_id,
+                price_usd=Decimal("50"),
+                sold_at=now
+                - timedelta(days=80),  # within 90d window but before earliest index (50d)
+                parser_confidence=Decimal("0.9"),
+                parser_method="rule",
+            )
+        )
         s.flush()
         return c.card_id
 
@@ -238,13 +259,15 @@ def seeded_holding_for_flow(seeded_panel_with_pricing_inputs):
 
     card_id = seeded_panel_with_pricing_inputs
     with session_scope() as s:
-        s.add(PortfolioHolding(
-            card_id=card_id,
-            acquired_at=datetime(2026, 1, 1, tzinfo=UTC),
-            acquired_cost_usd=Decimal("80"),
-            channel="ebay",
-            status="held",
-            entry_factor_decile=10,
-            entry_liquidity_tier="A",
-        ))
+        s.add(
+            PortfolioHolding(
+                card_id=card_id,
+                acquired_at=datetime(2026, 1, 1, tzinfo=UTC),
+                acquired_cost_usd=Decimal("80"),
+                channel="ebay",
+                status="held",
+                entry_factor_decile=10,
+                entry_liquidity_tier="A",
+            )
+        )
     return card_id

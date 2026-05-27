@@ -33,6 +33,7 @@ def _latest_panel_for_card(card_id: int) -> tuple[int | None, str | None]:
     # cs_momentum_pct is a percentile in [0, 1]. Decile = ceil(score * 10).
     # Top decile (score in (0.9, 1.0]) maps to 10.
     import math
+
     decile = max(1, min(10, math.ceil(float(score) * 10))) if score is not None else None
     return decile, (str(tier) if tier is not None else None)
 

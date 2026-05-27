@@ -68,13 +68,13 @@ def estimate_half_spread(
         log_hl_sq = np.log(np.where(L1 > 0, H1 / L1, 1.0)) ** 2
         log_hl2_sq = np.log(np.where(L2 > 0, H2 / L2, 1.0)) ** 2
 
-    beta = log_hl_sq[:-1] + log_hl_sq[1:]            # per-pair β
-    gamma = log_hl2_sq                                # per-pair γ
+    beta = log_hl_sq[:-1] + log_hl_sq[1:]  # per-pair β
+    gamma = log_hl2_sq  # per-pair γ
 
     sqrt_2beta = np.sqrt(np.maximum(2.0 * beta, 0.0))
     sqrt_beta = np.sqrt(np.maximum(beta, 0.0))
     alpha_num = (sqrt_2beta - sqrt_beta) / _K - np.sqrt(np.maximum(gamma / _K, 0.0))
-    alpha = np.maximum(alpha_num, 0.0)                # clip negatives
+    alpha = np.maximum(alpha_num, 0.0)  # clip negatives
 
     spread_pct = 2.0 * (np.exp(alpha) - 1.0) / (1.0 + np.exp(alpha))
     spread_pct = spread_pct[np.isfinite(spread_pct)]

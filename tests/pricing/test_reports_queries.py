@@ -10,6 +10,7 @@ from sportscards.reports.queries import get_open_exit_signals, get_trade_targets
 @pytest.mark.usefixtures("migrated_db")
 def test_get_trade_targets_returns_rows(seeded_panel_with_pricing_inputs):
     from sportscards.pricing.targets import persist_targets_for_panel
+
     as_of = date(2026, 5, 27)
     with session_scope() as s:
         persist_targets_for_panel(s, as_of)
@@ -31,20 +32,25 @@ def test_resolve_exit_signal_is_idempotent_under_double_click():
 
     with session_scope() as s:
         h = PortfolioHolding(
-            card_id=1, acquired_at=datetime(2026, 1, 1, tzinfo=UTC),
-            acquired_cost_usd=Decimal("100"), channel="ebay", status="held",
+            card_id=1,
+            acquired_at=datetime(2026, 1, 1, tzinfo=UTC),
+            acquired_cost_usd=Decimal("100"),
+            channel="ebay",
+            status="held",
         )
         s.add(h)
         s.flush()
         sig = ExitSignal(
-            holding_id=h.holding_id, rule_triggered="target_hit",
-            recommended_action="sell_50pct", as_of_date=date(2026, 5, 27),
+            holding_id=h.holding_id,
+            rule_triggered="target_hit",
+            recommended_action="sell_50pct",
+            as_of_date=date(2026, 5, 27),
         )
         s.add(sig)
         s.flush()
         sig_id = sig.id
 
-    assert resolve_exit_signal(sig_id) is True   # first click resolves
+    assert resolve_exit_signal(sig_id) is True  # first click resolves
     assert resolve_exit_signal(sig_id) is False  # second click no-ops
 
     with session_scope() as s:
@@ -60,20 +66,24 @@ def test_get_open_exit_signals_only_returns_unresolved(seeded_holding_for_flow):
 
     as_of = date(2026, 5, 27)
     with session_scope() as s:
-        s.add(ExitSignal(
-            holding_id=1,
-            rule_triggered="target_hit",
-            recommended_action="sell_50pct",
-            as_of_date=as_of,
-            resolved_at=None,
-        ))
-        s.add(ExitSignal(
-            holding_id=1,
-            rule_triggered="price_stop",
-            recommended_action="sell_100pct",
-            as_of_date=as_of,
-            resolved_at=datetime(2026, 5, 27, tzinfo=UTC),
-        ))
+        s.add(
+            ExitSignal(
+                holding_id=1,
+                rule_triggered="target_hit",
+                recommended_action="sell_50pct",
+                as_of_date=as_of,
+                resolved_at=None,
+            )
+        )
+        s.add(
+            ExitSignal(
+                holding_id=1,
+                rule_triggered="price_stop",
+                recommended_action="sell_100pct",
+                as_of_date=as_of,
+                resolved_at=datetime(2026, 5, 27, tzinfo=UTC),
+            )
+        )
     df = get_open_exit_signals()
     assert df["resolved_at"].isna().all()
     assert len(df) == 1

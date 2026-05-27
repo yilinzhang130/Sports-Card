@@ -422,17 +422,27 @@ def get_trade_targets(*, card_ids: Iterable[int], as_of: date) -> pd.DataFrame:
     if not ids:
         return pd.DataFrame(
             columns=[
-                "card_id", "as_of_date", "fair_value", "bid_max",
-                "sell_target", "stop_loss", "confidence",
-                "half_spread_pct", "liquidity_margin_pct",
+                "card_id",
+                "as_of_date",
+                "fair_value",
+                "bid_max",
+                "sell_target",
+                "stop_loss",
+                "confidence",
+                "half_spread_pct",
+                "liquidity_margin_pct",
             ]
         )
     with session_scope() as s:
-        rows = s.execute(
-            select(TradeTargets)
-            .where(TradeTargets.card_id.in_(ids))
-            .where(TradeTargets.as_of_date == as_of)
-        ).scalars().all()
+        rows = (
+            s.execute(
+                select(TradeTargets)
+                .where(TradeTargets.card_id.in_(ids))
+                .where(TradeTargets.as_of_date == as_of)
+            )
+            .scalars()
+            .all()
+        )
         return pd.DataFrame(
             [
                 {
@@ -454,11 +464,15 @@ def get_trade_targets(*, card_ids: Iterable[int], as_of: date) -> pd.DataFrame:
 def get_open_exit_signals() -> pd.DataFrame:
     """Return all unresolved exit signals, newest first."""
     with session_scope() as s:
-        rows = s.execute(
-            select(ExitSignal)
-            .where(ExitSignal.resolved_at.is_(None))
-            .order_by(ExitSignal.as_of_date.desc(), ExitSignal.id.desc())
-        ).scalars().all()
+        rows = (
+            s.execute(
+                select(ExitSignal)
+                .where(ExitSignal.resolved_at.is_(None))
+                .order_by(ExitSignal.as_of_date.desc(), ExitSignal.id.desc())
+            )
+            .scalars()
+            .all()
+        )
         return pd.DataFrame(
             [
                 {
