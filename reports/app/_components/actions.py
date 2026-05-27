@@ -157,15 +157,6 @@ def scouting_score_class(
 # ---------------------------------------------------------------------------
 
 
-def cardladder_import(*, path: str) -> dict[str, Any]:
-    """Mirror ``sportscards cardladder import <path>``."""
-    from sportscards.ingest.cardladder import import_sales_csv
-
-    # import_sales_csv manages its own session_scope internally
-    raw_added, clean_added = import_sales_csv(path)
-    return {"raw_added": raw_added, "clean_added": clean_added}
-
-
 def auction_import(*, path: str, house: str) -> dict[str, Any]:
     """Mirror ``sportscards auction import <house> <path>``."""
     from sportscards.ingest.auction_import import import_auction_csv

@@ -32,27 +32,6 @@ def _render_status(slot_key: str) -> None:
         st.error(s["error"])
 
 
-# --- Card Ladder CSV upload --------------------------------------------------
-with st.expander("Card Ladder CSV import", expanded=True):
-    with st.form("form_cl"):
-        uploaded = st.file_uploader("Card Ladder sales CSV", type=["csv"], key="cl_upload")
-        ok = confirm_toggle("confirm_cl")
-        submitted = st.form_submit_button("Import", disabled=not ok or uploaded is None)
-        if submitted and uploaded is not None:
-            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-                tmp.write(uploaded.getvalue())
-                path = tmp.name
-            run_id = submit_job(
-                "cardladder_import",
-                actions.cardladder_import,
-                params={"filename": uploaded.name},
-                kwargs={"path": path},
-            )
-            st.session_state["job_cl"] = run_id
-            st.rerun()
-    _render_status("job_cl")
-
-
 # --- Auction CSV upload ------------------------------------------------------
 with st.expander("Auction-house CSV import"):
     with st.form("form_auction"):
