@@ -17,6 +17,7 @@ def _latest_panel_for_card(card_id: int) -> tuple[int | None, str | None]:
     """Return (factor_decile, liquidity_tier) from the most recent FactorPanel
     row for ``card_id``, or (None, None) if no row exists."""
     from sqlalchemy import select
+
     from sportscards.db.models import FactorPanel
 
     with session_scope() as s:
