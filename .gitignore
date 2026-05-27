@@ -14,6 +14,8 @@ build/
 .DS_Store
 data/
 .worktrees/
+.claude/
+models/
 *.csv
 *.parquet
 !tests/fixtures/*.csv
