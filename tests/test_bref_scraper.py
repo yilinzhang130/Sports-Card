@@ -180,8 +180,6 @@ def test_cache_key_for_url_player_page() -> None:
 
 def test_cache_key_for_url_draft_page() -> None:
     assert (
-        _bref_scraper._cache_key_for_url(
-            "https://www.basketball-reference.com/draft/NBA_2018.html"
-        )
+        _bref_scraper._cache_key_for_url("https://www.basketball-reference.com/draft/NBA_2018.html")
         == "draft_2018.html"
     )

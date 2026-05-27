@@ -46,9 +46,7 @@ from tenacity import (
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://www.basketball-reference.com"
-_USER_AGENT = (
-    "sportscards-quant/0.1 (research; +https://github.com/yilinzhang130/Sports-Card)"
-)
+_USER_AGENT = "sportscards-quant/0.1 (research; +https://github.com/yilinzhang130/Sports-Card)"
 _CACHE_DIR = Path("data/scouting_cache/bref_html")
 _MIN_REQ_INTERVAL_S = 3.5  # BR throttles around 20 req/min
 _REQUEST_TIMEOUT_S = 30.0
