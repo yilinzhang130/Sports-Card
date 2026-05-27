@@ -59,14 +59,13 @@ terminal — that command warns on stderr for every override applied.
 
 ### 📥 Ingest
 
-- Card Ladder CSV upload → `import_sales_csv(path)`
 - Auction-house CSV upload (Goldin / Heritage / Fanatics Collect) →
   `import_auction_csv(path, house)`
 - eBay sold-listings ingest → `ingest_sold(...)` (button auto-disables when
   `EBAY_CLIENT_ID` is missing from `.env`)
 - PSA pop snapshot → `daily_psa_pop_flow()`
 
-All four spawn background jobs (see `model_run_log` for status).
+All three spawn background jobs (see `model_run_log` for status).
 
 ### 🔧 Parse Triage
 
@@ -135,7 +134,8 @@ reports/app/
 │   ├── 5_🃏_Master_Data.py
 │   ├── 6_🧪_Models.py
 │   ├── 7_📅_Catalysts.py
-│   └── 8_📈_Backtest.py
+│   ├── 8_📈_Backtest.py
+│   └── 9_💰_Pricing.py
 └── _components/
     ├── auth.py        # localhost guard
     ├── ui.py          # confirm_toggle, job_badge
@@ -149,3 +149,20 @@ reports/app/
 
 Action wrappers in `_components/actions.py` are thin shims around the same
 functions the CLI subcommands call — no business logic is duplicated.
+
+## Pricing & Exit Signals
+
+The pricing module turns factor recommendations into actionable trade
+targets. After each factor-panel refresh, the `pricing-refresh` flow
+writes one row per recommended card to `trade_targets` and emits
+`exit_signal` rows for any open holding that trips an exit rule.
+
+- **Trade targets** per card (`bid_max | fair_value | sell_target |
+  stop_loss`) plus a confidence score (recency of last comp).
+- **Exit signals** appear in the "💰 Pricing" page of the dashboard.
+  Each unresolved signal has a one-click Resolve action.
+
+Card Ladder is no longer ingested via CSV (Card Ladder Pro doesn't
+expose a market-data CSV export). The browser remains the trader's
+manual sanity check; programmatic queries go through the cert lookup
+client (`pricing/cert_lookup.py`) used by the grading-EV sleeve.

@@ -58,20 +58,6 @@ def ingest_ebay_cmd(keywords: str | None, pages: int) -> None:
 
 
 @cli.group()
-def cardladder() -> None:
-    """Card Ladder operations."""
-
-
-@cardladder.command("import")
-@click.argument("path", type=click.Path(exists=True))
-def cardladder_import_cmd(path: str) -> None:
-    from sportscards.ingest.cardladder import import_sales_csv
-
-    raw, clean = import_sales_csv(path)
-    click.echo(f"imported {raw} raw / {clean} clean from {path}")
-
-
-@cli.group()
 def auction() -> None:
     """Auction-house CSV import (Goldin/Heritage/Fanatics Collect)."""
 

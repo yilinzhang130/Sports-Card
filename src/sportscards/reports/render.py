@@ -42,4 +42,8 @@ def render_monthly_letter(month: str, out_dir: Path | None = None) -> Path:
 
 
 # Re-export for tests that monkeypatch the renderer module.
-__all__ = ["LetterMetrics", "collect_letter_metrics", "render_monthly_letter"]
+__all__ = [
+    "LetterMetrics",
+    "collect_letter_metrics",
+    "render_monthly_letter",
+]

@@ -49,3 +49,21 @@ deployments:
       - cron: "0 9 * * *"
         timezone: America/Los_Angeles
         active: true
+
+  - name: factor-panel-refresh
+    entrypoint: src/sportscards/flows/factor_panel.py:factor_panel_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "0 5 * * 1"
+        timezone: America/Los_Angeles
+        active: true
+
+  - name: pricing-refresh
+    entrypoint: src/sportscards/flows/pricing_refresh.py:pricing_refresh_flow
+    work_pool:
+      name: default-agent-pool
+    schedules:
+      - cron: "0 6 * * 1"
+        timezone: America/Los_Angeles
+        active: true
