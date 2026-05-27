@@ -402,3 +402,83 @@ def _sleeve_allocation(engine: Engine) -> pd.DataFrame:
         text("SELECT sleeve, target_weight, current_weight FROM backtest_runs_latest_alloc"),
         engine,
     )
+
+
+# --- Trader Console (Phase 6) --------------------------------------------------
+
+
+from collections.abc import Iterable  # noqa: E402
+from datetime import date  # noqa: E402
+
+from sqlalchemy import select  # noqa: E402
+
+from sportscards.db.models import ExitSignal, TradeTargets  # noqa: E402
+from sportscards.db.session import session_scope  # noqa: E402
+
+
+def get_trade_targets(*, card_ids: Iterable[int], as_of: date) -> pd.DataFrame:
+    """Return trade-target rows for the given card IDs on ``as_of``."""
+    ids = list(card_ids)
+    if not ids:
+        return pd.DataFrame(
+            columns=[
+                "card_id", "as_of_date", "fair_value", "bid_max",
+                "sell_target", "stop_loss", "confidence",
+                "half_spread_pct", "liquidity_margin_pct",
+            ]
+        )
+    with session_scope() as s:
+        rows = s.execute(
+            select(TradeTargets)
+            .where(TradeTargets.card_id.in_(ids))
+            .where(TradeTargets.as_of_date == as_of)
+        ).scalars().all()
+        return pd.DataFrame(
+            [
+                {
+                    "card_id": r.card_id,
+                    "as_of_date": r.as_of_date,
+                    "fair_value": float(r.fair_value),
+                    "bid_max": float(r.bid_max),
+                    "sell_target": float(r.sell_target),
+                    "stop_loss": float(r.stop_loss),
+                    "confidence": float(r.confidence),
+                    "half_spread_pct": float(r.half_spread_pct),
+                    "liquidity_margin_pct": float(r.liquidity_margin_pct),
+                }
+                for r in rows
+            ]
+        )
+
+
+def get_open_exit_signals() -> pd.DataFrame:
+    """Return all unresolved exit signals, newest first."""
+    with session_scope() as s:
+        rows = s.execute(
+            select(ExitSignal)
+            .where(ExitSignal.resolved_at.is_(None))
+            .order_by(ExitSignal.as_of_date.desc(), ExitSignal.id.desc())
+        ).scalars().all()
+        return pd.DataFrame(
+            [
+                {
+                    "id": r.id,
+                    "holding_id": r.holding_id,
+                    "rule_triggered": r.rule_triggered,
+                    "recommended_action": r.recommended_action,
+                    "as_of_date": r.as_of_date,
+                    "notes": r.notes,
+                    "resolved_at": r.resolved_at,
+                }
+                for r in rows
+            ]
+        )
+
+
+def resolve_exit_signal(signal_id: int) -> None:
+    """Mark an exit signal as resolved (sets resolved_at to now)."""
+    with session_scope() as s:
+        sig = s.get(ExitSignal, signal_id)
+        if sig is None:
+            return
+        sig.resolved_at = datetime.now(tz=UTC)
