@@ -31,17 +31,17 @@ dependencies = [
     "streamlit>=1.39",
     "jinja2>=3.1",
     "plotly>=5.24",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.2",
 ]
 
 [project.optional-dependencies]
 scouting-live = [
-    # Pulled only for the live NBA ingest path. Both libraries are known to
-    # break when the upstream source changes; tests inject a fake client so
-    # the test suite does not require these deps.
-    "basketball-reference-scraper>=1.0.6",
-    # NBA's "unofficial official" stats API; we use the DraftCombineStats
-    # endpoint. The raw stats.nba.com endpoint requires specific headers and
-    # connection handling that this library encapsulates.
+    # Pulled only for the live NBA ingest path. NBA's "unofficial official"
+    # stats API; we use the DraftCombineStats endpoint. The raw
+    # stats.nba.com endpoint requires specific headers and connection
+    # handling that this library encapsulates. Tests inject a fake client
+    # so the test suite does not require this dep.
     "nba_api>=1.4",
 ]
 events-live = [

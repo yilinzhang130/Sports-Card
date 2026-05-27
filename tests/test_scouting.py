@@ -87,12 +87,11 @@ class FakeBRefClient:
     def get_draft_class(self, year: int) -> pd.DataFrame:
         return self._prospects[self._prospects["draft_year"] == year].copy()
 
-    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
-        slug_for_name = self._prospects.loc[self._prospects["name"] == name, "br_slug"]
-        if slug_for_name.empty:
-            raise KeyError(name)
-        slug = slug_for_name.iloc[0]
-        bpm = float(self._outcomes.loc[self._outcomes["br_slug"] == slug, "career_bpm_5y"].iloc[0])
+    def get_player_career_advanced(self, br_slug: str, max_seasons: int = 5) -> pd.DataFrame:
+        match = self._outcomes.loc[self._outcomes["br_slug"] == br_slug, "career_bpm_5y"]
+        if match.empty:
+            raise KeyError(br_slug)
+        bpm = float(match.iloc[0])
         return pd.DataFrame({"BPM": [bpm], "WS": [bpm * 2], "VORP": [bpm / 3]})
 
 
@@ -102,7 +101,9 @@ class FakeBRefClient:
 def test_ingest_writes_parquet(tmp_path: Path, synthetic_data) -> None:
     prospects, outcomes = synthetic_data
     client = FakeBRefClient(prospects, outcomes)
-    p_path, o_path = ingest_bref.ingest_year(2018, client=client, cache_dir=tmp_path)
+    p_path, o_path = ingest_bref.ingest_year(
+        2018, client=client, cache_dir=tmp_path, upsert_to_master=False
+    )
 
     assert p_path.exists()
     assert o_path.exists()

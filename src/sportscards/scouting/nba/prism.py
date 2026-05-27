@@ -77,17 +77,20 @@ def train_pairwise_model(
         train_mask = pd.Series(True, index=groups.index)
         valid_mask = pd.Series(False, index=groups.index)
 
+    # CatBoost requires rows pre-sorted by group_id within each Pool.
+    train_idx = groups.loc[train_mask].sort_values(kind="stable").index
     train_pool = Pool(
-        data=X.loc[train_mask].values,
-        label=y.loc[train_mask].values,
-        group_id=groups.loc[train_mask].values,
+        data=X.loc[train_idx].values,
+        label=y.loc[train_idx].values,
+        group_id=groups.loc[train_idx].values,
     )
     eval_pool = None
     if valid_mask.any():
+        valid_idx = groups.loc[valid_mask].sort_values(kind="stable").index
         eval_pool = Pool(
-            data=X.loc[valid_mask].values,
-            label=y.loc[valid_mask].values,
-            group_id=groups.loc[valid_mask].values,
+            data=X.loc[valid_idx].values,
+            label=y.loc[valid_idx].values,
+            group_id=groups.loc[valid_idx].values,
         )
 
     model = CatBoostRanker(
