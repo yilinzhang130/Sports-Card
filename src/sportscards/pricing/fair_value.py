@@ -55,6 +55,7 @@ def blend(
     if index_projected is None and hedonic_predicted is None:
         return None
     if index_projected is None:
+        assert hedonic_predicted is not None
         return float(hedonic_predicted)
     if hedonic_predicted is None:
         return float(index_projected)
@@ -192,7 +193,7 @@ def _latest_index_ts(session: Session, card: Card) -> datetime:
     ).first()
     if row is None:
         return datetime(1970, 1, 1, tzinfo=UTC)
-    ts = row[0]
+    ts: datetime = row[0]
     return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
 
 

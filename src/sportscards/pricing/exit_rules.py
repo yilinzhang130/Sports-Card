@@ -211,4 +211,4 @@ def _factor_decile_rank(session: Session, as_of: date) -> dict[int, float]:
     df = pd.DataFrame(rows, columns=["card_id", "score"])
     df["score"] = df["score"].astype(float)
     df["rank_pct"] = df["score"].rank(pct=True)
-    return {int(r.card_id): float(r.rank_pct) for r in df.itertuples()}
+    return {int(r.card_id): float(r.rank_pct) for r in df.itertuples()}  # type: ignore[arg-type]

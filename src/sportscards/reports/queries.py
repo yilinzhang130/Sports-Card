@@ -501,4 +501,4 @@ def resolve_exit_signal(signal_id: int) -> bool:
             .where(ExitSignal.resolved_at.is_(None))
             .values(resolved_at=datetime.now(tz=UTC))
         )
-        return result.rowcount > 0
+        return bool(result.rowcount > 0)  # type: ignore[attr-defined]

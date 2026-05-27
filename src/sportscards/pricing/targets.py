@@ -85,9 +85,9 @@ def _factor_zscore_lookup(session: Session, as_of: date) -> dict[int, float]:
     df["score"] = df["score"].astype(float)
     mu, sigma = df["score"].mean(), df["score"].std(ddof=0)
     if not sigma or pd.isna(sigma):
-        return {int(r.card_id): 0.0 for r in df.itertuples()}
+        return {int(r.card_id): 0.0 for r in df.itertuples()}  # type: ignore[arg-type]
     df["z"] = (df["score"] - mu) / sigma
-    return {int(r.card_id): float(r.z) for r in df.itertuples()}
+    return {int(r.card_id): float(r.z) for r in df.itertuples()}  # type: ignore[arg-type]
 
 
 def _sold_history(session: Session, card_id: int, as_of: date) -> pd.DataFrame:
