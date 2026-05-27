@@ -42,7 +42,12 @@ def upgrade() -> None:
 
     op.create_table(
         "exit_signal",
-        sa.Column("id", sa.BigInteger().with_variant(sa.Integer, "sqlite"), primary_key=True, autoincrement=True),
+        sa.Column(
+            "id",
+            sa.BigInteger().with_variant(sa.Integer, "sqlite"),
+            primary_key=True,
+            autoincrement=True,
+        ),
         sa.Column(
             "holding_id",
             sa.Integer,

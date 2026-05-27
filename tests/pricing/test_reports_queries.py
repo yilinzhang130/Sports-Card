@@ -24,9 +24,10 @@ def test_get_trade_targets_returns_rows(seeded_panel_with_pricing_inputs):
 def test_resolve_exit_signal_is_idempotent_under_double_click():
     from datetime import UTC, datetime
 
+    from sqlalchemy import select
+
     from sportscards.db.models import ExitSignal, PortfolioHolding
     from sportscards.reports.queries import resolve_exit_signal
-    from sqlalchemy import select
 
     with session_scope() as s:
         h = PortfolioHolding(

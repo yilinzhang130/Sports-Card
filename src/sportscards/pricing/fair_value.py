@@ -17,13 +17,13 @@ import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
-log = logging.getLogger(__name__)
-
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import Card, RepeatSalesIndex, TxClean
+
+log = logging.getLogger(__name__)
 
 TAU_DAYS = 30.0
 STALE_INDEX_DAYS = 14
