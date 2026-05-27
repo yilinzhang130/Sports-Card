@@ -13,6 +13,29 @@ from sportscards.db.models import PortfolioHolding
 from sportscards.db.session import session_scope
 
 
+def _latest_panel_for_card(card_id: int) -> tuple[int | None, str | None]:
+    """Return (factor_decile, liquidity_tier) from the most recent FactorPanel
+    row for ``card_id``, or (None, None) if no row exists."""
+    from sqlalchemy import select
+    from sportscards.db.models import FactorPanel
+
+    with session_scope() as s:
+        rows = s.execute(
+            select(FactorPanel.cs_momentum_pct, FactorPanel.liquidity_tier)
+            .where(FactorPanel.card_id == card_id)
+            .order_by(FactorPanel.as_of_date.desc())
+            .limit(1)
+        ).first()
+    if rows is None:
+        return None, None
+    score, tier = rows
+    # cs_momentum_pct is a percentile in [0, 1]. Decile = ceil(score * 10).
+    # Top decile (score in (0.9, 1.0]) maps to 10.
+    import math
+    decile = max(1, min(10, math.ceil(float(score) * 10))) if score is not None else None
+    return decile, (str(tier) if tier is not None else None)
+
+
 def add_holding(
     *,
     card_id: int,
@@ -24,6 +47,7 @@ def add_holding(
     channel: str,
     actor: str = "ui",
 ) -> int:
+    entry_decile, entry_tier = _latest_panel_for_card(card_id)
     with session_scope() as s:
         row = PortfolioHolding(
             card_id=card_id,
@@ -34,13 +58,21 @@ def add_holding(
             acquired_cost_usd=acquired_cost_usd,
             channel=channel,
             status="held",
+            entry_factor_decile=entry_decile,
+            entry_liquidity_tier=entry_tier,
         )
         s.add(row)
         s.flush()
         holding_id = row.holding_id
     write_audit(
         "holding_add",
-        {"holding_id": holding_id, "card_id": card_id, "cost": str(acquired_cost_usd)},
+        {
+            "holding_id": holding_id,
+            "card_id": card_id,
+            "cost": str(acquired_cost_usd),
+            "entry_factor_decile": entry_decile,
+            "entry_liquidity_tier": entry_tier,
+        },
         actor=actor,
     )
     return holding_id
