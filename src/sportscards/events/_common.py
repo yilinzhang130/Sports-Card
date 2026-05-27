@@ -12,15 +12,26 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from collections.abc import Iterable, Sequence
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from rapidfuzz import fuzz, process
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from sportscards.db.models import Player, PlayerEvent
+
+_FUZZY_SCORE_CUTOFF = 88
+
+
+def _normalize_name(s: str) -> str:
+    """Lowercase + strip diacritics so 'Dončić' matches 'Doncic'."""
+    decomposed = unicodedata.normalize("NFKD", s)
+    return "".join(c for c in decomposed if not unicodedata.combining(c)).strip().lower()
+
 
 logger = logging.getLogger("sportscards.events")
 
@@ -28,15 +39,39 @@ DEFAULT_CACHE_ROOT = Path("data/events_cache")
 
 
 def resolve_player_by_name(session: Session, name: str) -> int | None:
-    """Case-insensitive exact match against :attr:`Player.name`.
+    """Resolve ``name`` to a ``player_id``: exact match first, then fuzzy.
 
-    Returns the matched ``player_id`` or ``None``; logs a warning on miss.
+    Live scrapers feed in names with diacritics ("Luka Dončić"), suffixes
+    ("Jr."), or alternate spellings that the player_master rows may not
+    carry verbatim. Exact case-insensitive match is tried first; on miss we
+    fall back to rapidfuzz WRatio with score cutoff 88 against the full
+    name list. Returns ``None`` (and warns) when neither resolves.
     """
-    stmt = select(Player.player_id).where(func.lower(Player.name) == name.strip().lower())
+    cleaned = name.strip()
+    stmt = select(Player.player_id).where(func.lower(Player.name) == cleaned.lower())
     pid = session.execute(stmt).scalars().first()
-    if pid is None:
+    if pid is not None:
+        return pid
+
+    # Diacritic-tolerant exact match before falling back to fuzzy scoring.
+    target = _normalize_name(cleaned)
+    all_players = session.execute(select(Player.player_id, Player.name)).all()
+    if not all_players:
         logger.warning("could not resolve player by name: %s", name)
-    return pid
+        return None
+    for row_pid, row_name in all_players:
+        if _normalize_name(row_name) == target:
+            return int(row_pid)
+
+    choices = {row_pid: _normalize_name(row_name) for row_pid, row_name in all_players}
+    match = process.extractOne(
+        target, choices, scorer=fuzz.WRatio, score_cutoff=_FUZZY_SCORE_CUTOFF
+    )
+    if match is None:
+        logger.warning("could not resolve player by name: %s", name)
+        return None
+    # extractOne with a dict returns (matched_value, score, key)
+    return int(match[2])
 
 
 def existing_event_keys(

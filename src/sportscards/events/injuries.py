@@ -53,16 +53,85 @@ class InjuryClient(Protocol):
     def get_injury_report(self, as_of: date) -> list[InjuryRow]: ...
 
 
-class LiveInjuryClient:
-    """Production client wrapping nba_api's injury endpoint.
+_ESPN_INJURIES_URL = "https://www.espn.com/nba/injuries"
 
-    Not invoked from tests; left as a stub to be fleshed out when nba_api
-    is added to the project deps.
+
+def parse_espn_injuries(html: str, *, as_of: date) -> list[InjuryRow]:
+    """Parse the ESPN NBA injuries page into ``InjuryRow``s.
+
+    ESPN renders a per-team ``<section class="Card">`` block, each holding
+    a ``<table class="Table">`` with columns ``NAME | POS | EST. RETURN DATE
+    | STATUS | COMMENT``. Header rows lack a ``data-idx`` attr so we filter
+    them out via column count.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    out: list[InjuryRow] = []
+    for table in soup.select("table"):
+        for tr in table.select("tbody tr"):
+            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+            if len(cells) < 5:
+                continue
+            name, _pos, est_return, status, comment = cells[:5]
+            if not name:
+                continue
+            note_parts = [p for p in (est_return, comment) if p]
+            out.append(
+                InjuryRow(
+                    nba_player_id=0,
+                    name=name,
+                    status=status,
+                    status_date=as_of,
+                    note=" | ".join(note_parts) if note_parts else None,
+                )
+            )
+    return out
+
+
+class LiveInjuryClient:
+    """Scrapes ESPN's NBA injuries page.
+
+    The page is server-rendered so plain ``httpx`` + ``BeautifulSoup`` is
+    sufficient. We cache the raw HTML on disk per day so that a layout
+    change upstream (which would silently return zero rows) falls back to
+    the most recent good snapshot instead of bricking the pipeline.
     """
 
-    def get_injury_report(self, as_of: date) -> list[InjuryRow]:  # pragma: no cover
-        # TODO: call nba_api.stats.endpoints.playerinjuries or league_dash equivalent.
-        raise NotImplementedError("LiveInjuryClient not implemented; add nba_api dep first")
+    def __init__(
+        self,
+        *,
+        url: str = _ESPN_INJURIES_URL,
+        cache_dir: Path = Path("data/events_cache/injuries/html"),
+    ) -> None:
+        self._url = url
+        self._cache_dir = cache_dir
+
+    def get_injury_report(self, as_of: date) -> list[InjuryRow]:
+        from sportscards.events._http import fetch_html
+
+        self._cache_dir.mkdir(parents=True, exist_ok=True)
+        cache_path = self._cache_dir / f"{as_of.isoformat()}.html"
+
+        html: str | None = None
+        try:
+            html = fetch_html(self._url)
+            cache_path.write_text(html, encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001 - log + fall back to cache
+            logger.warning("ESPN injuries fetch failed (%s); falling back to cache", exc)
+
+        if html:
+            rows = parse_espn_injuries(html, as_of=as_of)
+            if rows:
+                return rows
+            logger.warning("ESPN injuries parser returned 0 rows; layout drift suspected")
+
+        # Fallback: most recent cached HTML.
+        cached = sorted(self._cache_dir.glob("*.html"))
+        if not cached:
+            raise RuntimeError("ESPN injuries unavailable and no cached HTML to fall back to")
+        fallback = cached[-1].read_text(encoding="utf-8")
+        return parse_espn_injuries(fallback, as_of=as_of)
 
 
 def _classify(status: str) -> str | None:
