@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Mirrors .github/workflows/ci.yml so push-time failures are caught locally.
+# Bypass with `git push --no-verify` in emergencies.
+set -euo pipefail
+
+echo "[pre-push] running ci-fast (lint + format + mypy)..."
+make ci-fast
+
+# Only run the heavy DB+test leg if Postgres is reachable. Otherwise skip with
+# a warning so the hook stays usable when the dev DB is down.
+if uv run python -c "import os, psycopg; psycopg.connect(os.environ.get('DATABASE_URL','postgresql://sportscards:sportscards@localhost:5432/sportscards'), connect_timeout=2).close()" 2>/dev/null; then
+    echo "[pre-push] DB reachable -> running alembic + pytest"
+    uv run alembic upgrade head
+    uv run pytest tests/
+else
+    echo "[pre-push] WARN: DB unreachable, skipping alembic + pytest. Run 'make up && make ci' before merging."
+fi
