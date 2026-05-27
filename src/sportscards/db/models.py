@@ -343,6 +343,8 @@ class PortfolioHolding(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="held")
     sold_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sold_proceeds_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    entry_factor_decile: Mapped[int | None] = mapped_column(Integer)
+    entry_liquidity_tier: Mapped[str | None] = mapped_column(String(1))
 
     __table_args__ = (
         Index("ix_holdings_card", "card_id"),
@@ -405,3 +407,44 @@ class GradingEv(Base):
     )
 
     __table_args__ = (Index("ix_grading_ev_ev_per_dollar", "ev_per_dollar"),)
+
+
+class TradeTargets(Base):
+    """Per-card daily pricing targets: fair value, bid ceiling, sell target, stop loss."""
+
+    __tablename__ = "trade_targets"
+
+    card_id: Mapped[int] = mapped_column(
+        ForeignKey("card_master.card_id"), primary_key=True
+    )
+    as_of_date: Mapped[Any] = mapped_column(Date, primary_key=True)
+    fair_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    bid_max: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    sell_target: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    stop_loss: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    confidence: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
+    half_spread_pct: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+    liquidity_margin_pct: Mapped[Decimal] = mapped_column(Numeric(6, 4), nullable=False)
+
+
+class ExitSignal(Base):
+    """Exit signals triggered by pricing rules for portfolio holdings."""
+
+    __tablename__ = "exit_signal"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    holding_id: Mapped[int] = mapped_column(
+        ForeignKey("portfolio_holdings.holding_id"), nullable=False
+    )
+    rule_triggered: Mapped[str] = mapped_column(Text, nullable=False)
+    recommended_action: Mapped[str] = mapped_column(Text, nullable=False)
+    as_of_date: Mapped[Any] = mapped_column(Date, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint(
+            "holding_id", "rule_triggered", "as_of_date",
+            name="uq_exit_signal_holding_rule_day",
+        ),
+    )
