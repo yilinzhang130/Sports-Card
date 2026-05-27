@@ -56,3 +56,20 @@ def test_get_cert_rate_limit_raises_retryable():
     with patch("sportscards.pricing.cert_lookup.requests.get",
                return_value=_fake_response(429, {})), pytest.raises(RateLimitedError):
         client.get_cert("x")
+
+
+def test_get_cert_null_price_returns_none_not_crash():
+    client = CardLadderCertLookup(api_base="https://example/api", api_key="k")
+    payload = {
+        "cert_number": "x",
+        "grader": "PSA",
+        "grade": 10,
+        "last_sold": {"price": None, "date": None},
+        "card_ladder_value": None,
+    }
+    with patch("sportscards.pricing.cert_lookup.requests.get",
+               return_value=_fake_response(200, payload)):
+        result = client.get_cert("x")
+    assert result.last_sold_price is None
+    assert result.last_sold_date is None
+    assert result.card_ladder_value is None

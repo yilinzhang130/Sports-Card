@@ -56,8 +56,8 @@ class CardLadderCertLookup:
             cert_number=str(data.get("cert_number", cert_number)),
             grader=str(data.get("grader", "")),
             grade=float(data.get("grade", 0)),
-            last_sold_price=(float(ls["price"]) if "price" in ls else None),
-            last_sold_date=(str(ls["date"]) if "date" in ls else None),
+            last_sold_price=(float(ls["price"]) if ls.get("price") is not None else None),
+            last_sold_date=(str(ls["date"]) if ls.get("date") is not None else None),
             card_ladder_value=(
                 float(data["card_ladder_value"])
                 if data.get("card_ladder_value") is not None
