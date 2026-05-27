@@ -186,3 +186,23 @@ def seeded_panel_with_pricing_inputs(seeded_card_and_index):
             )
         )
     return card_id
+
+
+@pytest.fixture
+def seeded_holding_for_flow(seeded_panel_with_pricing_inputs):
+    from datetime import UTC, datetime
+
+    from sportscards.db.models import PortfolioHolding
+
+    card_id = seeded_panel_with_pricing_inputs
+    with session_scope() as s:
+        s.add(PortfolioHolding(
+            card_id=card_id,
+            acquired_at=datetime(2026, 1, 1, tzinfo=UTC),
+            acquired_cost_usd=Decimal("80"),
+            channel="ebay",
+            status="held",
+            entry_factor_decile=10,
+            entry_liquidity_tier="A",
+        ))
+    return card_id
