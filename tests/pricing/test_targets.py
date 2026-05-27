@@ -1,12 +1,8 @@
-from datetime import date
-from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
 from sportscards.pricing.targets import (
-    K_SELL_TARGET,
-    LIQUIDITY_MARGIN,
-    TradeTargetsValues,
     derive_targets,
 )
 
@@ -52,12 +48,10 @@ def test_exact_arithmetic():
     assert out.stop_loss == pytest.approx(100 * (1 - 2 * 0.05))
 
 
-from sqlalchemy import select
-
-
 @pytest.mark.usefixtures("migrated_db")
 def test_persist_targets_writes_rows_for_panel(seeded_panel_with_pricing_inputs):
     from datetime import date as _date
+
     from sportscards.db.models import TradeTargets
     from sportscards.db.session import session_scope
     from sportscards.pricing.targets import persist_targets_for_panel

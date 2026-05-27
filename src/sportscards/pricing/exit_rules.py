@@ -81,12 +81,12 @@ def evaluate_open_positions(session: Session, as_of: date) -> list[ExitSignalDTO
         # Rule 3: time stop
         acquired = h.acquired_at if h.acquired_at.tzinfo else h.acquired_at.replace(tzinfo=UTC)
         held_days = (datetime.combine(as_of, datetime.min.time(), tzinfo=UTC) - acquired).days
-        if held_days > TIME_STOP_DAYS and price is not None:
-            if price < TIME_STOP_PRICE_RATIO * float(h.acquired_cost_usd):
-                fired.append(ExitSignalDTO(
-                    h.holding_id, "time_stop", "sell_100pct", as_of,
-                    f"held {held_days}d, price {price:.2f} < {TIME_STOP_PRICE_RATIO}×cost",
-                ))
+        cost_threshold = TIME_STOP_PRICE_RATIO * float(h.acquired_cost_usd)
+        if held_days > TIME_STOP_DAYS and price is not None and price < cost_threshold:
+            fired.append(ExitSignalDTO(
+                h.holding_id, "time_stop", "sell_100pct", as_of,
+                f"held {held_days}d, price {price:.2f} < {TIME_STOP_PRICE_RATIO}×cost",
+            ))
 
         # Rule 4: price stop
         if price is not None and tt is not None and price < float(tt.stop_loss):

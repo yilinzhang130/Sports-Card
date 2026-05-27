@@ -1,5 +1,5 @@
 import math
-from datetime import date, datetime, UTC
+from datetime import date
 
 import pytest
 

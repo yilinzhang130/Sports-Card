@@ -47,14 +47,12 @@ def test_get_cert_returns_parsed_result():
 def test_get_cert_404_raises():
     client = CardLadderCertLookup(api_base="https://example/api", api_key="k")
     with patch("sportscards.pricing.cert_lookup.requests.get",
-               return_value=_fake_response(404, {})):
-        with pytest.raises(CertNotFoundError):
-            client.get_cert("nope")
+               return_value=_fake_response(404, {})), pytest.raises(CertNotFoundError):
+        client.get_cert("nope")
 
 
 def test_get_cert_rate_limit_raises_retryable():
     client = CardLadderCertLookup(api_base="https://example/api", api_key="k")
     with patch("sportscards.pricing.cert_lookup.requests.get",
-               return_value=_fake_response(429, {})):
-        with pytest.raises(RateLimitedError):
-            client.get_cert("x")
+               return_value=_fake_response(429, {})), pytest.raises(RateLimitedError):
+        client.get_cert("x")

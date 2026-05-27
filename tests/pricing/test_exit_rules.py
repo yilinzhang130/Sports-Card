@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -103,10 +103,12 @@ def test_rule_factor_reversal_when_dropped_out_of_decile(seeded_card_and_index):
         # Seed a second card with high momentum so the test card ranks below top decile
         from sportscards.db.models import Card, Player
         p2 = Player(name="Other Player")
-        s.add(p2); s.flush()
+        s.add(p2)
+        s.flush()
         c2 = Card(year=2018, manufacturer="Panini", set_name="Prizm",
                   player_id=p2.player_id, card_number="9", parallel="Base")
-        s.add(c2); s.flush()
+        s.add(c2)
+        s.flush()
         _add_panel(s, c2.card_id, as_of, cs_momentum_pct=Decimal("0.99"))
         signals = evaluate_open_positions(s, as_of)
     rules = {(sg.rule_triggered, sg.recommended_action) for sg in signals}
