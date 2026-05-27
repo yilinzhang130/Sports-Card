@@ -12,13 +12,13 @@ so the unit suite never touches the network.
 from __future__ import annotations
 
 import logging
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_exponential
+
+from sportscards.scouting.nba import _bref_scraper
 
 logger = logging.getLogger(__name__)
 
@@ -127,38 +127,25 @@ class BRefClient(Protocol):
 
 @dataclass
 class LiveBRefClient:
-    """Production client that wraps ``basketball_reference_scraper``.
+    """Production client backed by the internal ``_bref_scraper`` module.
 
-    Kept thin and isolated so it can be swapped or stubbed wholesale. The
-    upstream library is known to break when BR's HTML changes; callers should
-    expect ``RuntimeError`` and degrade gracefully.
+    Thin shim over the scraper so callers (and tests) can substitute a
+    fake without touching the network. Rate limiting, caching, and retry
+    all live inside the scraper; we don't double-wrap with @retry here.
     """
 
+    # Retained for backward compatibility with callers that pass a custom
+    # delay; unused now that rate-limiting lives inside _bref_scraper.
     sleep_s: float = BREF_MIN_REQ_INTERVAL_S
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
     def get_draft_class(self, year: int) -> pd.DataFrame:
-        try:
-            from basketball_reference_scraper.drafts import get_draft_class
-        except ImportError as e:  # pragma: no cover
-            raise RuntimeError("basketball_reference_scraper not installed") from e
-        time.sleep(self.sleep_s)
-        df = get_draft_class(year)
-        df = df.rename(columns=str.lower)
-        if "player" in df.columns and "name" not in df.columns:
-            df["name"] = df["player"]
-        if "pk" in df.columns and "draft_pick" not in df.columns:
-            df["draft_pick"] = pd.to_numeric(df["pk"], errors="coerce")
-        df["draft_year"] = year
-        return cast(pd.DataFrame, df)
+        return _bref_scraper.fetch_draft_class(year)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
     def get_current_ncaa_season(self, season: str) -> pd.DataFrame:
-        """Production current-season ingest is not wired against any concrete
-        upstream source yet — the `basketball_reference_scraper` library does
-        not expose D-I per-100 stats. Live usage requires a custom HTML
-        scraper or sports-reference paid API; for now the live path raises
-        so tests must inject a fake client.
+        """Current-season NCAA ingest is not wired against any concrete
+        upstream source. Live usage requires a custom HTML scraper or
+        sports-reference paid API; for now the live path raises so tests
+        must inject a fake client.
         """
         raise RuntimeError(
             "LiveBRefClient.get_current_ncaa_season is not implemented; inject a "
@@ -166,20 +153,8 @@ class LiveBRefClient:
             "Bart Torvik, KenPom) or pre-stage a parquet under data/scouting_cache/."
         )
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=3, max=30))
     def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
-        """`basketball_reference_scraper.players.get_stats` expects a *player
-        name* (e.g. "Luka Doncic"), not a BR slug. The ingester is responsible
-        for passing the name column, not the slug.
-        """
-        try:
-            from basketball_reference_scraper.players import get_stats
-        except ImportError as e:  # pragma: no cover
-            raise RuntimeError("basketball_reference_scraper not installed") from e
-        time.sleep(self.sleep_s)
-        df = get_stats(name, stat_type="ADVANCED", playoffs=False, career=False)
-        df = df.rename(columns=str.upper).head(max_seasons)
-        return cast(pd.DataFrame, df)
+        return _bref_scraper.fetch_player_career_advanced(name, max_seasons=max_seasons)
 
 
 def ingest_year(
