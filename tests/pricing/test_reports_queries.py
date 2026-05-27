@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
@@ -17,6 +18,37 @@ def test_get_trade_targets_returns_rows(seeded_panel_with_pricing_inputs):
     row = df.iloc[0]
     assert row["bid_max"] < row["fair_value"]
     assert row["fair_value"] < row["sell_target"]
+
+
+@pytest.mark.usefixtures("migrated_db")
+def test_resolve_exit_signal_is_idempotent_under_double_click():
+    from datetime import UTC, datetime
+
+    from sportscards.db.models import ExitSignal, PortfolioHolding
+    from sportscards.reports.queries import resolve_exit_signal
+    from sqlalchemy import select
+
+    with session_scope() as s:
+        h = PortfolioHolding(
+            card_id=1, acquired_at=datetime(2026, 1, 1, tzinfo=UTC),
+            acquired_cost_usd=Decimal("100"), channel="ebay", status="held",
+        )
+        s.add(h)
+        s.flush()
+        sig = ExitSignal(
+            holding_id=h.holding_id, rule_triggered="target_hit",
+            recommended_action="sell_50pct", as_of_date=date(2026, 5, 27),
+        )
+        s.add(sig)
+        s.flush()
+        sig_id = sig.id
+
+    assert resolve_exit_signal(sig_id) is True   # first click resolves
+    assert resolve_exit_signal(sig_id) is False  # second click no-ops
+
+    with session_scope() as s:
+        sig = s.execute(select(ExitSignal).where(ExitSignal.id == sig_id)).scalar_one()
+        assert sig.resolved_at is not None
 
 
 @pytest.mark.usefixtures("migrated_db")

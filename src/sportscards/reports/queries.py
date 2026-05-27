@@ -475,10 +475,16 @@ def get_open_exit_signals() -> pd.DataFrame:
         )
 
 
-def resolve_exit_signal(signal_id: int) -> None:
-    """Mark an exit signal as resolved (sets resolved_at to now)."""
+def resolve_exit_signal(signal_id: int) -> bool:
+    """Mark a signal resolved. Returns True if the row was actually updated
+    (False means it was already resolved — race condition guard)."""
+    from sqlalchemy import update
+
     with session_scope() as s:
-        sig = s.get(ExitSignal, signal_id)
-        if sig is None:
-            return
-        sig.resolved_at = datetime.now(tz=UTC)
+        result = s.execute(
+            update(ExitSignal)
+            .where(ExitSignal.id == signal_id)
+            .where(ExitSignal.resolved_at.is_(None))
+            .values(resolved_at=datetime.now(tz=UTC))
+        )
+        return result.rowcount > 0
