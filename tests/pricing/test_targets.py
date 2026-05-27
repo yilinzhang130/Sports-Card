@@ -21,7 +21,7 @@ def test_stop_loss_below_bid_max():
         liquidity_tier="A", factor_zscore=0.0,
     )
     assert out.stop_loss < out.fair_value
-    assert out.stop_loss <= out.bid_max
+    assert out.stop_loss < out.bid_max
 
 
 def test_tier_D_has_wider_margin_than_tier_A():
@@ -38,6 +38,11 @@ def test_sell_target_increases_with_factor_zscore():
 
 
 def test_exact_arithmetic():
+    # half_spread=0.05, tier="B" (margin=0.05):
+    # bid_max = 100*(1-0.10) = 90
+    # tier_anchored_stop = 100*(1-0.10) = 90
+    # stop_cap = 90 - 5 = 85
+    # stop_loss = min(90, 85) = 85
     out = derive_targets(
         fair_value=100.0, half_spread=0.05,
         liquidity_tier="B", factor_zscore=1.0,
@@ -45,7 +50,22 @@ def test_exact_arithmetic():
     assert out.fair_value == pytest.approx(100.0)
     assert out.bid_max == pytest.approx(100 * (1 - 0.05 - 0.05))
     assert out.sell_target == pytest.approx(100 * (1 + 0.05 + 0.15))
-    assert out.stop_loss == pytest.approx(100 * (1 - 2 * 0.05))
+    assert out.stop_loss == pytest.approx(85.0)
+
+
+def test_stop_loss_capped_when_spread_exceeds_margin():
+    out = derive_targets(
+        fair_value=100.0,
+        half_spread=0.10,        # 10% C-S spread
+        liquidity_tier="A",      # margin = 0.03
+        factor_zscore=0.0,
+    )
+    # bid_max = 100 * (1 - 0.10 - 0.03) = 87
+    # tier_anchored_stop = 100 * (1 - 0.06) = 94  (would violate invariant)
+    # stop_cap = 87 - 3 = 84
+    assert out.bid_max == pytest.approx(87.0)
+    assert out.stop_loss == pytest.approx(84.0)
+    assert out.stop_loss < out.bid_max
 
 
 @pytest.mark.usefixtures("migrated_db")

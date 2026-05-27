@@ -51,7 +51,11 @@ def derive_targets(
     margin = LIQUIDITY_MARGIN.get(liquidity_tier, 0.10)
     bid_max = fair_value * (1.0 - half_spread - margin)
     sell_target = fair_value * (1.0 + half_spread + factor_zscore * K_SELL_TARGET)
-    stop_loss = fair_value * (1.0 - 2.0 * margin)
+    # Tier-anchored stop, capped strictly below bid_max for wide-spread cards
+    # so the invariant stop_loss < bid_max holds even when half_spread > margin.
+    tier_anchored_stop = fair_value * (1.0 - 2.0 * margin)
+    stop_cap = bid_max - margin * fair_value
+    stop_loss = min(tier_anchored_stop, stop_cap)
     return TradeTargetsValues(
         card_id=card_id,
         as_of_date=as_of_date or date.today(),

@@ -118,11 +118,11 @@ sell_target = fair_value × (1 + half_spread + factor_zscore × k)
 stop_loss   = fair_value × (1 - 2 × liquidity_margin)
 ```
 
-Note: when implicit half-spread is wider than the liquidity margin
-(e.g. a thin tier-A name with a >3% C-S spread), `stop_loss` can
-coincide with `bid_max`; the invariant is `stop_loss ≤ bid_max`,
-not strict. This is an intended edge-case signal that the name is
-borderline untradeable, not a formula bug.
+Note: `stop_loss` is the tier-anchored level `fair × (1 - 2·margin)`
+capped at `bid_max - margin·fair` whenever the implicit half-spread
+exceeds the liquidity margin. This guarantees the strict invariant
+`stop_loss < bid_max` and gives a tighter stop for cards with wide
+spreads (their bid is already low — the stop must be lower still).
 
 - `factor_zscore`: cross-sectional z-score of the card's composite factor
   score (momentum + mispricing_residual) within its sport / parallel_tier.
