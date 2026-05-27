@@ -189,6 +189,48 @@ def seeded_panel_with_pricing_inputs(seeded_card_and_index):
 
 
 @pytest.fixture
+def seeded_card_predating_index():
+    """Card sold 100 days ago; earliest index row only 50 days old."""
+    with session_scope() as s:
+        p = Player(name="Long Tail Player")
+        s.add(p)
+        s.flush()
+        c = Card(
+            year=2018, manufacturer="Panini", set_name="Prizm",
+            player_id=p.player_id, card_number="42", parallel="Base",
+        )
+        s.add(c)
+        s.flush()
+        now = datetime(2026, 5, 27, tzinfo=UTC)
+        s.add_all([
+            RepeatSalesIndex(
+                sport="NBA", era="modern", bucket="weekly", grade_tier="PSA10",
+                period_start=now - timedelta(days=50), index_value=Decimal("100"),
+                n_pairs=0,
+            ),
+            RepeatSalesIndex(
+                sport="NBA", era="modern", bucket="weekly", grade_tier="PSA10",
+                period_start=now, index_value=Decimal("120"),
+                n_pairs=0,
+            ),
+        ])
+        raw = TxRaw(
+            source="ebay", external_id="predating-1",
+            raw_json={}, raw_title="Predating Sale",
+        )
+        s.add(raw)
+        s.flush()
+        s.add(TxClean(
+            raw_id=raw.raw_id, card_id=c.card_id,
+            price_usd=Decimal("50"),
+            sold_at=now - timedelta(days=80),  # within 90d window but before earliest index (50d)
+            parser_confidence=Decimal("0.9"), parser_method="rule",
+        ))
+        s.flush()
+        return c.card_id
+
+
+@pytest.fixture
 def seeded_holding_for_flow(seeded_panel_with_pricing_inputs):
     from datetime import UTC, datetime
 

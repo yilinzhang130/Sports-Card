@@ -55,6 +55,21 @@ def test_compute_fair_value_uses_index_reprojection(seeded_card_and_index):
 
 
 @pytest.mark.usefixtures("migrated_db")
+def test_compute_fair_value_uses_earliest_index_when_sale_predates_history(
+    seeded_card_predating_index,
+):
+    """Card sold 80d ago; earliest index row is only 50d old → use earliest as ts_then."""
+    from sportscards.db.session import session_scope
+    from sportscards.pricing.fair_value import compute_fair_value
+
+    card_id = seeded_card_predating_index
+    with session_scope() as s:
+        fv = compute_fair_value(s, card_id, date(2026, 5, 27), hedonic_predicted=None)
+    # earliest index=100, latest=120, last_sold=$50 → projected = 50 * 120/100 = 60
+    assert fv.index_projected == pytest.approx(60.0, rel=0.05)
+
+
+@pytest.mark.usefixtures("migrated_db")
 def test_compute_fair_value_stale_index_falls_back_to_hedonic(seeded_stale_index):
     from sportscards.db.session import session_scope
     from sportscards.pricing.fair_value import compute_fair_value

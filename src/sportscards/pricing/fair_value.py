@@ -12,9 +12,12 @@ Approach (Card Ladder "CL Value" style):
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
+
+log = logging.getLogger(__name__)
 
 import pandas as pd
 from sqlalchemy import select
@@ -156,10 +159,23 @@ def _index_pair(
     df["period_start"] = pd.to_datetime(df["period_start"], utc=True)
     now = df[df["period_start"] <= ts_now]["index_value"]
     then = df[df["period_start"] <= ts_then]["index_value"]
-    return (
-        float(now.iloc[-1]) if len(now) else None,
-        float(then.iloc[-1]) if len(then) else None,
-    )
+    now_val = float(now.iloc[-1]) if len(now) else None
+    if len(then):
+        then_val = float(then.iloc[-1])
+    elif len(now):
+        # ts_then predates the earliest index point — use the earliest
+        # available value as a conservative no-growth fallback rather than
+        # dropping the projection entirely.
+        earliest = float(df["index_value"].iloc[0])
+        log.debug(
+            "_index_pair: ts_then=%s predates earliest index period; "
+            "using earliest value %s as fallback",
+            ts_then, earliest,
+        )
+        then_val = earliest
+    else:
+        then_val = None
+    return now_val, then_val
 
 
 def _latest_index_ts(session: Session, card: Card) -> datetime:
