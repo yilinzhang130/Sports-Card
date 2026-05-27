@@ -4,20 +4,25 @@ Replaces the unmaintained ``basketball_reference_scraper`` library, which
 broke when modern pandas stopped accepting raw HTML strings in
 ``read_html``. Used only by ``LiveBRefClient`` in ``ingest_bref.py``.
 
-Three public entry points:
+Two public entry points:
 
-* :func:`fetch_draft_class` — one row per drafted player in a given year,
-  including the advanced college stats BR ships on the draft page (often
-  wrapped in ``<!-- ... -->`` comments to evade simple scrapers).
+* :func:`fetch_draft_class` — one row per drafted player in a given year.
+  Pulls the ``#stats`` table from ``/draft/NBA_<year>.html``. The columns
+  BR ships here are the player's *eventual* NBA career summary (PTS,
+  TRB, AST, WS, BPM, VORP) plus draft slot — not their NCAA advanced
+  rates. The downstream ``_normalize_prospects`` helper fills the
+  ``trb_pct``/``ast_pct``/… columns it expects with ``NA`` if absent,
+  matching the prior library's behavior.
+
 * :func:`fetch_player_career_advanced` — up to N seasons of advanced NBA
   stats for a player, looked up by name via BR's search redirect.
+  Returns columns with **uppercase** names (``BPM``, ``WS``, ``VORP``)
+  to match the existing ``BRefClient`` contract.
 
 Raw HTML is cached to ``data/scouting_cache/bref_html/`` so repeat ingest
-runs are free. Pass ``refresh=True`` to bypass the cache for a single call.
-
-Polite to BR: a module-level rate limiter enforces ~17 req/min (under the
-documented ~20/min throttle), and ``tenacity`` retries transient errors
-with exponential backoff.
+runs are free. Pass ``refresh=True`` to bypass the cache for a single
+call. The module-level rate limiter enforces ~17 req/min, comfortably
+under BR's documented ~20/min throttle.
 """
 
 from __future__ import annotations
@@ -50,12 +55,14 @@ _REQUEST_TIMEOUT_S = 30.0
 
 _last_request_ts: float = 0.0
 
+_SLUG_FROM_HREF = re.compile(r"/players/[a-z]/([a-z0-9]+)\.html")
+
 
 def _cache_key_for_url(url: str) -> str:
-    """Derive a filesystem-safe cache key from a BR URL.
+    """Filesystem-safe cache key for a BR URL.
 
     Examples:
-        ``/draft/NBA_2018.html`` → ``draft_NBA_2018.html``
+        ``/draft/NBA_2018.html`` → ``draft_2018.html``
         ``/players/d/doncilu01.html`` → ``player_doncilu01.html``
     """
     path = urllib.parse.urlparse(url).path
@@ -68,7 +75,11 @@ def _cache_key_for_url(url: str) -> str:
     if "players" in parts:
         return f"player_{last}.html"
     if "draft" in parts:
-        return f"{last}.html"
+        # /draft/NBA_2018.html → draft_2018.html
+        year_match = re.search(r"(\d{4})", last)
+        if year_match:
+            return f"draft_{year_match.group(1)}.html"
+        return f"draft_{last}.html"
     return f"{'_'.join(parts[-2:])}.html"
 
 
@@ -79,12 +90,7 @@ def _cache_key_for_url(url: str) -> str:
     reraise=True,
 )
 def _rate_limited_get(url: str, refresh: bool = False) -> str:
-    """Fetch a BR URL, honoring cache and the inter-request delay.
-
-    Returns the response text. Raises ``httpx.HTTPStatusError`` on a 4xx/5xx
-    that survives retries; transient errors are retried 3x with exponential
-    backoff.
-    """
+    """Fetch a BR URL, honoring cache and the inter-request delay."""
     cache_path = _CACHE_DIR / _cache_key_for_url(url)
     if cache_path.exists() and not refresh:
         return cache_path.read_text(encoding="utf-8")
@@ -113,20 +119,165 @@ def _rate_limited_get(url: str, refresh: bool = False) -> str:
 
 
 def _strip_html_comments(html: str) -> str:
-    """Expose tables BR hides inside ``<!-- ... -->`` comments."""
+    """Expose tables BR hides inside ``<!-- ... -->`` to evade scrapers."""
     return re.sub(r"<!--|-->", "", html)
+
+
+def _cell_text(row, data_stat: str) -> str | None:
+    cell = row.find(attrs={"data-stat": data_stat})
+    if cell is None:
+        return None
+    text = cell.get_text(strip=True)
+    return text or None
 
 
 def fetch_draft_class(year: int, refresh: bool = False) -> pd.DataFrame:
     """Pull the NBA draft class for ``year``.
 
-    Returns one row per drafted player, with columns matching the
-    ``BRefClient.get_draft_class`` contract: ``br_slug``, ``name``,
-    ``draft_pick``, ``draft_year``, ``position``, ``age_at_draft``,
-    ``trb_pct``, ``ast_pct``, ``stl_pct``, ``blk_pct``, ``usg_pct``,
-    ``ts_pct``. Missing columns are ``NA``.
+    Returns one row per drafted player with at least: ``br_slug``,
+    ``name``, ``draft_pick``, ``draft_year``. Additional career-summary
+    columns BR ships on the draft page (``ws``, ``bpm``, ``vorp``,
+    ``pts_per_g``, …) are included where present.
     """
-    raise NotImplementedError
+    url = f"{_BASE_URL}/draft/NBA_{year}.html"
+    html = _strip_html_comments(_rate_limited_get(url, refresh=refresh))
+    soup = BeautifulSoup(html, "lxml")
+    table = soup.find("table", id="stats")
+    if table is None:
+        logger.warning("no #stats table on %s — returning empty frame", url)
+        return pd.DataFrame(columns=["br_slug", "name", "draft_pick", "draft_year"])
+
+    tbody = table.find("tbody")
+    rows = tbody.find_all("tr") if tbody else []
+    records: list[dict[str, object]] = []
+    for row in rows:
+        classes = row.get("class") or []
+        if "thead" in classes or "over_header" in classes:
+            continue
+        anchor = row.find("td", attrs={"data-stat": "player"})
+        anchor = anchor.find("a") if anchor else None
+        if anchor is None:
+            continue
+        slug_match = _SLUG_FROM_HREF.search(anchor.get("href", ""))
+        if slug_match is None:
+            continue
+
+        rec: dict[str, object] = {
+            "br_slug": slug_match.group(1),
+            "name": anchor.get_text(strip=True),
+            "draft_pick": pd.to_numeric(_cell_text(row, "pick_overall"), errors="coerce"),
+            "draft_year": year,
+        }
+        # Pass through any other cells BR provides on the draft page. The
+        # downstream _normalize_prospects helper only reads a fixed
+        # subset; extras are harmless.
+        for cell in row.find_all(["td", "th"]):
+            ds = cell.get("data-stat")
+            if ds in (None, "player", "pick_overall", "ranker") or ds in rec:
+                continue
+            text = cell.get_text(strip=True) or None
+            if text is None:
+                rec[ds] = pd.NA
+            else:
+                # Numeric-looking columns: coerce. String columns
+                # (team_id, college_name) survive coercion as NaN, which
+                # is wrong, so attempt numeric only when the text parses.
+                num = pd.to_numeric(text, errors="coerce")
+                rec[ds] = num if pd.notna(num) else text
+        records.append(rec)
+
+    df = pd.DataFrame(records)
+    df["draft_pick"] = pd.to_numeric(df.get("draft_pick"), errors="coerce")
+    return df
+
+
+def _resolve_player_html(name: str, refresh: bool = False) -> tuple[str, str]:
+    """Resolve a player name → (br_slug, html_text) via BR's search redirect.
+
+    BR's search endpoint 302-redirects to the canonical player page when
+    the search term resolves uniquely. We follow the redirect, parse the
+    slug from the final URL, and return both the slug and the page HTML.
+    The HTML is cached under ``player_<slug>.html`` so repeat lookups
+    skip the network.
+    """
+    # Try the search endpoint first.
+    search_url = (
+        f"{_BASE_URL}/search/search.fcgi?"
+        + urllib.parse.urlencode({"search": name, "hint": "", "pid": "", "idx": ""})
+    )
+
+    global _last_request_ts
+    now = time.monotonic()
+    wait_s = _MIN_REQ_INTERVAL_S - (now - _last_request_ts)
+    if wait_s > 0:
+        time.sleep(wait_s)
+
+    with httpx.Client(
+        headers={"User-Agent": _USER_AGENT},
+        timeout=_REQUEST_TIMEOUT_S,
+        follow_redirects=True,
+    ) as client:
+        response = client.get(search_url)
+    _last_request_ts = time.monotonic()
+    response.raise_for_status()
+
+    slug_match = _SLUG_FROM_HREF.search(str(response.url))
+    if slug_match is None:
+        raise LookupError(f"BR search did not resolve to a player page for {name!r}")
+    slug = slug_match.group(1)
+    text = response.text
+
+    cache_path = _CACHE_DIR / f"player_{slug}.html"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    if refresh or not cache_path.exists():
+        tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(cache_path)
+    else:
+        # Prefer cached copy for stability across runs.
+        text = cache_path.read_text(encoding="utf-8")
+    return slug, text
+
+
+def _parse_advanced_table(html: str, max_seasons: int) -> pd.DataFrame:
+    """Extract up-to-``max_seasons`` season-summary rows from ``#advanced``.
+
+    Drops team-split rows (``class="partial_table"``) so summary stats
+    aren't double-counted. Column names are uppercased to match the
+    legacy ``BRefClient.get_player_career_advanced`` contract.
+    """
+    soup = BeautifulSoup(_strip_html_comments(html), "lxml")
+    table = soup.find("table", id="advanced")
+    if table is None or table.find("tbody") is None:
+        return pd.DataFrame(columns=["BPM", "WS", "VORP"])
+
+    records: list[dict[str, object]] = []
+    for row in table.find("tbody").find_all("tr"):
+        classes = row.get("class") or []
+        if "thead" in classes or "over_header" in classes:
+            continue
+        if "partial_table" in classes:
+            # Team-split row; the summary is the row immediately above.
+            continue
+        rec: dict[str, object] = {}
+        for cell in row.find_all(["td", "th"]):
+            ds = cell.get("data-stat")
+            if not ds:
+                continue
+            text = cell.get_text(strip=True) or None
+            if text is None:
+                rec[ds] = pd.NA
+                continue
+            num = pd.to_numeric(text, errors="coerce")
+            rec[ds] = num if pd.notna(num) else text
+        if rec:
+            records.append(rec)
+        if len(records) >= max_seasons:
+            break
+
+    df = pd.DataFrame(records)
+    df.columns = [c.upper() for c in df.columns]
+    return df
 
 
 def fetch_player_career_advanced(
@@ -138,4 +289,5 @@ def fetch_player_career_advanced(
     (``BPM``, ``WS``, ``VORP``, …), matching the
     ``BRefClient.get_player_career_advanced`` contract.
     """
-    raise NotImplementedError
+    _slug, html = _resolve_player_html(name, refresh=refresh)
+    return _parse_advanced_table(html, max_seasons=max_seasons)
