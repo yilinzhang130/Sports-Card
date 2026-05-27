@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -7,10 +7,9 @@ from sqlalchemy import select
 from sportscards.db.models import ExitSignal, PortfolioHolding, TradeTargets
 from sportscards.db.session import session_scope
 
-_ACQUIRED_AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
+_ACQUIRED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
-@pytest.mark.usefixtures("migrated_db")
 def test_trade_targets_roundtrip(migrated_db):
     with session_scope() as s:
         s.add(
@@ -73,13 +72,12 @@ def test_exit_signal_unique_per_rule_per_day(migrated_db):
     # Second identical signal should raise IntegrityError (bubbles out of session_scope)
     from sqlalchemy.exc import IntegrityError
 
-    with pytest.raises(IntegrityError):
-        with session_scope() as s:
-            s.add(
-                ExitSignal(
-                    holding_id=holding_id,
-                    rule_triggered="target_hit",
-                    recommended_action="sell_50pct",
-                    as_of_date=date(2026, 5, 27),
-                )
+    with pytest.raises(IntegrityError), session_scope() as s:
+        s.add(
+            ExitSignal(
+                holding_id=holding_id,
+                rule_triggered="target_hit",
+                recommended_action="sell_50pct",
+                as_of_date=date(2026, 5, 27),
             )
+        )

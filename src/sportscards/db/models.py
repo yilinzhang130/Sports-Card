@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -343,7 +345,7 @@ class PortfolioHolding(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="held")
     sold_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sold_proceeds_usd: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
-    entry_factor_decile: Mapped[int | None] = mapped_column(Integer)
+    entry_factor_decile: Mapped[int | None] = mapped_column(SmallInteger)
     entry_liquidity_tier: Mapped[str | None] = mapped_column(String(1))
 
     __table_args__ = (
@@ -417,7 +419,7 @@ class TradeTargets(Base):
     card_id: Mapped[int] = mapped_column(
         ForeignKey("card_master.card_id"), primary_key=True
     )
-    as_of_date: Mapped[Any] = mapped_column(Date, primary_key=True)
+    as_of_date: Mapped[date] = mapped_column(Date, primary_key=True)
     fair_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     bid_max: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     sell_target: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -432,13 +434,17 @@ class ExitSignal(Base):
 
     __tablename__ = "exit_signal"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"),
+        primary_key=True,
+        autoincrement=True,
+    )
     holding_id: Mapped[int] = mapped_column(
         ForeignKey("portfolio_holdings.holding_id"), nullable=False
     )
     rule_triggered: Mapped[str] = mapped_column(Text, nullable=False)
     recommended_action: Mapped[str] = mapped_column(Text, nullable=False)
-    as_of_date: Mapped[Any] = mapped_column(Date, nullable=False)
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
