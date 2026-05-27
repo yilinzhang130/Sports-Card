@@ -3327,11 +3327,13 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "beautifulsoup4" },
     { name = "catboost" },
     { name = "click" },
     { name = "httpx" },
     { name = "jinja2" },
     { name = "joblib" },
+    { name = "nba-api" },
     { name = "numpy" },
     { name = "openai" },
     { name = "optuna" },
@@ -3377,11 +3379,13 @@ dev = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "basketball-reference-scraper", marker = "extra == 'scouting-live'", specifier = ">=1.0.6" },
+    { name = "beautifulsoup4", specifier = ">=4.12" },
     { name = "catboost", specifier = ">=1.2" },
     { name = "click", specifier = ">=8.1" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "joblib", specifier = ">=1.4" },
+    { name = "nba-api", specifier = ">=1.4" },
     { name = "nba-api", marker = "extra == 'events-live'", specifier = ">=1.4" },
     { name = "nba-api", marker = "extra == 'scouting-live'", specifier = ">=1.4" },
     { name = "numpy", specifier = ">=2.0" },
