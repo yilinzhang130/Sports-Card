@@ -141,9 +141,7 @@ def test_live_awards_ingest_writes_events(session: Session, tmp_path: Path) -> N
     cache.mkdir()
     (cache / "2023-24.html").write_text(html)
     client = awards.LiveAwardsClient(cache_dir=cache, throttle_seconds=0.0)
-    n = awards.ingest_awards(
-        session, client=client, season="2023-24", cache_dir=tmp_path / "json"
-    )
+    n = awards.ingest_awards(session, client=client, season="2023-24", cache_dir=tmp_path / "json")
     # 1 MVP + 1 ROY + 1 DPOY + 15 All-NBA = 18; minus any unresolved names.
     # Fixture is curated so all map to seeded players (diacritics resolved via fuzzy).
     assert n == 18
@@ -235,9 +233,7 @@ def test_build_schedule_flags_series_clincher_and_finals() -> None:
             _team_row(game_id=gid, date_str=d, team="BOS", opp="GSW", home=True, win=bos_wins)
         )
         rows.append(
-            _team_row(
-                game_id=gid, date_str=d, team="GSW", opp="BOS", home=False, win=not bos_wins
-            )
+            _team_row(game_id=gid, date_str=d, team="GSW", opp="BOS", home=False, win=not bos_wins)
         )
 
     games = schedule.build_schedule_from_rows(rows)

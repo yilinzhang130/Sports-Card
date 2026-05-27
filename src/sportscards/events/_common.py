@@ -32,6 +32,7 @@ def _normalize_name(s: str) -> str:
     decomposed = unicodedata.normalize("NFKD", s)
     return "".join(c for c in decomposed if not unicodedata.combining(c)).strip().lower()
 
+
 logger = logging.getLogger("sportscards.events")
 
 DEFAULT_CACHE_ROOT = Path("data/events_cache")
