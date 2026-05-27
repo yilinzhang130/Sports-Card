@@ -151,6 +151,9 @@ def _compute_uplift(stardom_df: pd.DataFrame) -> pd.Series:
 
 
 def _stub_feature_row() -> dict:
+    # Must include every feature in hedonic.NUMERICAL_FEATURES /
+    # BOOLEAN_FEATURES / CATEGORICAL_FEATURES, otherwise the design-matrix
+    # build raises KeyError when newer hedonic versions add columns.
     return {
         "log_pop_psa10": 4.0,
         "log_pop_psa9_or_better": 4.5,
@@ -160,17 +163,24 @@ def _stub_feature_row() -> dict:
         "player_age_at_sale": 22.0,
         "years_since_draft": 1,
         "draft_pick": 10,
+        "cs_momentum_pct": 0.5,
+        "log_sales_count_90d": 1.5,
+        "bid_ask_proxy": 0.1,
+        "stardom_premium": 0.0,
+        "stardom_premium_x_is_rookie": 0.0,
+        "catalyst_score": 0.0,
+        "catalyst_score_30d_change": 0.0,
         "is_rookie": 1,
         "has_auto": 0,
         "has_patch": 0,
         "is_one_of_one": 0,
         "era_modern": 1,
+        "is_hyped": False,
+        "has_stardom_score": False,
         "set_tier": "flagship",
         "team_market": "standard",
         "slab_grader": "PSA",
-        "stardom_premium": 0.0,
-        "has_stardom_score": False,
-        "stardom_premium_x_is_rookie": 0.0,
+        "liquidity_tier": "B",
     }
 
 

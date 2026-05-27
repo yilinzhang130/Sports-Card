@@ -42,10 +42,23 @@ def _engine(engine: Engine | None) -> Engine:
 
 
 def repeat_sales_index(engine: Engine | None = None) -> pd.DataFrame:
-    """Time series of the repeat-sales index. Columns: as_of, sleeve, index_value."""
+    """Time series of the repeat-sales index. Columns: as_of, sleeve, index_value.
+
+    The underlying hypertable uses ``period_start`` as the time column and
+    partitions by (sport, bucket, grade_tier, era). We project those into the
+    (as_of, sleeve, index_value) shape the Market page expects, where
+    ``sleeve`` is "<era>/<grade_tier>" (e.g. "modern/PSA10").
+    """
     eng = _engine(engine)
     _require(eng, "repeat_sales_index", "Phase 2A")
-    sql = text("SELECT as_of, sleeve, index_value FROM repeat_sales_index ORDER BY as_of")
+    sql = text(
+        "SELECT period_start AS as_of, "
+        "       era || '/' || grade_tier AS sleeve, "
+        "       index_value "
+        "  FROM repeat_sales_index "
+        " WHERE index_value IS NOT NULL "
+        " ORDER BY period_start"
+    )
     return pd.read_sql(sql, eng)
 
 
