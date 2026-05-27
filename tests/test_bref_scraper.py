@@ -68,19 +68,15 @@ def test_fetch_draft_class_strips_html_comment_wrappers() -> None:
 
 
 def test_fetch_player_career_advanced_luka(luka_html: str) -> None:
-    with patch.object(
-        _bref_scraper,
-        "_resolve_player_html",
-        return_value=("doncilu01", luka_html),
-    ):
-        df = _bref_scraper.fetch_player_career_advanced("Luka Doncic", max_seasons=5)
+    with patch.object(_bref_scraper, "_rate_limited_get", return_value=luka_html):
+        df = _bref_scraper.fetch_player_career_advanced("doncilu01", max_seasons=5)
 
     assert len(df) <= 5
     assert {"BPM", "WS", "VORP"}.issubset(df.columns)
     # Luka was a +EV player from day one
     assert float(df["BPM"].iloc[0]) > 0
     assert float(df["WS"].sum()) > 0
-    # Should be 5 distinct season-summary rows (no team-split duplicates)
+    # Should be distinct season-summary rows (no team-split duplicates)
     assert df["YEAR_ID"].nunique() == len(df)
 
 
@@ -89,12 +85,8 @@ def test_fetch_player_career_advanced_skips_partial_table_rows(bagley_html: str)
     plus a 2TM summary row. We must keep the summary and drop the splits
     or _aggregate_outcome would double-count.
     """
-    with patch.object(
-        _bref_scraper,
-        "_resolve_player_html",
-        return_value=("baglema01", bagley_html),
-    ):
-        df = _bref_scraper.fetch_player_career_advanced("Marvin Bagley III", max_seasons=5)
+    with patch.object(_bref_scraper, "_rate_limited_get", return_value=bagley_html):
+        df = _bref_scraper.fetch_player_career_advanced("baglema01", max_seasons=5)
 
     assert df["YEAR_ID"].nunique() == len(df), "duplicate season rows leaked through"
     # Bagley was a sub-replacement player — career BPM should be negative
@@ -102,13 +94,16 @@ def test_fetch_player_career_advanced_skips_partial_table_rows(bagley_html: str)
 
 
 def test_fetch_player_career_advanced_respects_max_seasons(luka_html: str) -> None:
-    with patch.object(
-        _bref_scraper,
-        "_resolve_player_html",
-        return_value=("doncilu01", luka_html),
-    ):
-        df = _bref_scraper.fetch_player_career_advanced("Luka Doncic", max_seasons=3)
+    with patch.object(_bref_scraper, "_rate_limited_get", return_value=luka_html):
+        df = _bref_scraper.fetch_player_career_advanced("doncilu01", max_seasons=3)
     assert len(df) == 3
+
+
+def test_player_url_from_slug() -> None:
+    assert (
+        _bref_scraper._player_url("doncilu01")
+        == "https://www.basketball-reference.com/players/d/doncilu01.html"
+    )
 
 
 # ---- _rate_limited_get cache & refresh behavior ---------------------------

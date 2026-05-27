@@ -105,11 +105,11 @@ class BRefClient(Protocol):
         """
         ...
 
-    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
+    def get_player_career_advanced(self, br_slug: str, max_seasons: int = 5) -> pd.DataFrame:
         """Return up-to-``max_seasons`` rows of advanced NBA stats for one
-        player (looked up by player NAME — Basketball-Reference's scraper API
-        does not accept BR slugs), with at least ``BPM``, ``WS``, ``VORP``
-        columns.
+        player, looked up by BR slug (e.g. ``"doncilu01"``), with at least
+        ``BPM``, ``WS``, ``VORP`` columns. Returned column names are
+        uppercase.
         """
         ...
 
@@ -153,18 +153,23 @@ class LiveBRefClient:
             "Bart Torvik, KenPom) or pre-stage a parquet under data/scouting_cache/."
         )
 
-    def get_player_career_advanced(self, name: str, max_seasons: int = 5) -> pd.DataFrame:
-        return _bref_scraper.fetch_player_career_advanced(name, max_seasons=max_seasons)
+    def get_player_career_advanced(self, br_slug: str, max_seasons: int = 5) -> pd.DataFrame:
+        return _bref_scraper.fetch_player_career_advanced(br_slug, max_seasons=max_seasons)
 
 
 def ingest_year(
     year: int,
     client: BRefClient,
     cache_dir: Path = CACHE_DIR,
+    upsert_to_master: bool = True,
 ) -> tuple[Path, Path]:
     """Pull one draft class + 5-yr NBA outcomes and write two Parquet files.
 
-    Returns (prospects_path, outcomes_path).
+    Returns (prospects_path, outcomes_path). When ``upsert_to_master`` is
+    True (the default for live runs), each scraped prospect is also
+    inserted into ``player_master`` keyed by ``br_slug``; existing rows
+    are left untouched. This keeps the master roster in sync with the
+    canonical BR slug that the legacy scraper never exposed.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -174,6 +179,9 @@ def ingest_year(
     prospects.to_parquet(prospects_path, index=False)
     logger.info("wrote %d prospects → %s", len(prospects), prospects_path)
 
+    if upsert_to_master:
+        _upsert_prospects_to_master(prospects)
+
     outcomes: list[dict[str, float | str]] = []
     seen_slugs: set[str] = set()
     for row in prospects[["br_slug", "name"]].dropna(subset=["br_slug"]).itertuples(index=False):
@@ -182,7 +190,7 @@ def ingest_year(
             continue
         seen_slugs.add(slug)
         try:
-            adv = client.get_player_career_advanced(str(row.name), max_seasons=5)
+            adv = client.get_player_career_advanced(slug, max_seasons=5)
         except Exception as e:  # pragma: no cover - network errors degrade
             logger.warning("career fetch failed for %s (%s): %s", row.name, slug, e)
             continue
@@ -278,6 +286,53 @@ def _normalize_prospects(raw: pd.DataFrame, year: int) -> pd.DataFrame:
         if col not in df.columns:
             df[col] = pd.NA
     return df[PROSPECT_COLUMNS].copy()
+
+
+def _upsert_prospects_to_master(prospects: pd.DataFrame) -> int:
+    """Insert any new scraped prospects into ``player_master``.
+
+    Idempotent: rows with an existing ``br_slug`` are left untouched
+    (uses Postgres ``ON CONFLICT DO NOTHING``). Returns the number of
+    rows inserted; the test suite uses an in-memory engine without a
+    live session, so this is silently a no-op when the db is unreachable.
+    """
+    try:
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from sportscards.db.models import Player
+        from sportscards.db.session import session_scope
+    except ImportError:  # pragma: no cover
+        return 0
+
+    rows = [
+        {
+            "name": str(r.name),
+            "br_slug": str(r.br_slug),
+            "position": (str(r.position) if pd.notna(r.position) else None),
+            "draft_year": int(r.draft_year) if pd.notna(r.draft_year) else None,
+            "draft_pick": int(r.draft_pick) if pd.notna(r.draft_pick) else None,
+        }
+        for r in prospects.dropna(subset=["br_slug", "name"]).itertuples(index=False)
+    ]
+    if not rows:
+        return 0
+
+    inserted = 0
+    try:
+        with session_scope() as s:
+            for row in rows:
+                stmt = (
+                    pg_insert(Player)
+                    .values(**row)
+                    .on_conflict_do_nothing(index_elements=["br_slug"])
+                    .returning(Player.player_id)
+                )
+                inserted += len(s.execute(stmt).all())
+    except Exception as e:  # pragma: no cover - db may be unreachable in CLI mid-run
+        logger.warning("player_master upsert skipped: %s", e)
+        return 0
+    logger.info("upserted %d new prospects into player_master", inserted)
+    return inserted
 
 
 def _aggregate_outcome(slug: str, adv: pd.DataFrame) -> dict[str, float | str]:

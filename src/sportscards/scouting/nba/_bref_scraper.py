@@ -191,52 +191,15 @@ def fetch_draft_class(year: int, refresh: bool = False) -> pd.DataFrame:
     return df
 
 
-def _resolve_player_html(name: str, refresh: bool = False) -> tuple[str, str]:
-    """Resolve a player name → (br_slug, html_text) via BR's search redirect.
+def _player_url(br_slug: str) -> str:
+    """Build the canonical BR player-page URL from a slug.
 
-    BR's search endpoint 302-redirects to the canonical player page when
-    the search term resolves uniquely. We follow the redirect, parse the
-    slug from the final URL, and return both the slug and the page HTML.
-    The HTML is cached under ``player_<slug>.html`` so repeat lookups
-    skip the network.
+    BR organizes player pages alphabetically by the first letter of the
+    slug: ``/players/d/doncilu01.html``.
     """
-    # Try the search endpoint first.
-    search_url = (
-        f"{_BASE_URL}/search/search.fcgi?"
-        + urllib.parse.urlencode({"search": name, "hint": "", "pid": "", "idx": ""})
-    )
-
-    global _last_request_ts
-    now = time.monotonic()
-    wait_s = _MIN_REQ_INTERVAL_S - (now - _last_request_ts)
-    if wait_s > 0:
-        time.sleep(wait_s)
-
-    with httpx.Client(
-        headers={"User-Agent": _USER_AGENT},
-        timeout=_REQUEST_TIMEOUT_S,
-        follow_redirects=True,
-    ) as client:
-        response = client.get(search_url)
-    _last_request_ts = time.monotonic()
-    response.raise_for_status()
-
-    slug_match = _SLUG_FROM_HREF.search(str(response.url))
-    if slug_match is None:
-        raise LookupError(f"BR search did not resolve to a player page for {name!r}")
-    slug = slug_match.group(1)
-    text = response.text
-
-    cache_path = _CACHE_DIR / f"player_{slug}.html"
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    if refresh or not cache_path.exists():
-        tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
-        tmp.write_text(text, encoding="utf-8")
-        tmp.replace(cache_path)
-    else:
-        # Prefer cached copy for stability across runs.
-        text = cache_path.read_text(encoding="utf-8")
-    return slug, text
+    if not br_slug or not br_slug[0].isalpha():
+        raise ValueError(f"invalid br_slug: {br_slug!r}")
+    return f"{_BASE_URL}/players/{br_slug[0].lower()}/{br_slug}.html"
 
 
 def _parse_advanced_table(html: str, max_seasons: int) -> pd.DataFrame:
@@ -281,13 +244,18 @@ def _parse_advanced_table(html: str, max_seasons: int) -> pd.DataFrame:
 
 
 def fetch_player_career_advanced(
-    name: str, max_seasons: int = 5, refresh: bool = False
+    br_slug: str, max_seasons: int = 5, refresh: bool = False
 ) -> pd.DataFrame:
-    """Pull the advanced career stats for one player, looked up by name.
+    """Pull the advanced career stats for one player, looked up by BR slug.
 
     Returns up to ``max_seasons`` rows with **uppercase** column names
     (``BPM``, ``WS``, ``VORP``, …), matching the
     ``BRefClient.get_player_career_advanced`` contract.
+
+    Passing the slug instead of the player name avoids BR's brittle
+    search endpoint (which returns a 200 results page rather than a
+    302 redirect for many names, so slug recovery from the response URL
+    is unreliable).
     """
-    _slug, html = _resolve_player_html(name, refresh=refresh)
+    html = _rate_limited_get(_player_url(br_slug), refresh=refresh)
     return _parse_advanced_table(html, max_seasons=max_seasons)
