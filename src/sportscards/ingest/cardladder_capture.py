@@ -26,6 +26,12 @@ def _sale_id_from_url(value: str) -> str | None:
             return f"fanatics-weekly-{path_parts[1]}"
         if path_parts[0] == "buy-now":
             return f"fanatics-buy-now-{path_parts[1]}"
+    if host.endswith("alt.xyz") and len(path_parts) >= 3:
+        if path_parts[0] == "browse" and path_parts[1] == "sold":
+            return f"alt-sold-{path_parts[2]}"
+    if host.endswith("goldin.co") and len(path_parts) >= 2:
+        if path_parts[0] == "item":
+            return f"goldin-item-{path_parts[1]}"
     return None
 
 

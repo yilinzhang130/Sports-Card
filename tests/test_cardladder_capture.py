@@ -98,3 +98,39 @@ def test_capture_links_to_sales_uses_fanatics_buy_now_url_as_sale_id():
     sales = capture_links_to_sales(links, search_query="LeBron James Topps Chrome PSA 10")
 
     assert sales[0].external_sale_id == "fanatics-buy-now-b08d83bd-d033-4a10-99b3-b171502b2b59"
+
+
+def test_capture_links_to_sales_uses_alt_sold_url_as_sale_id():
+    links = [
+        {
+            "description": (
+                "ALT (CONFIRMED PAID) 2024 Panini Prizm Black Color Blast Duals "
+                "Shai Gilgeous-Alexander/Jalen Williams #6 PSA 10 Price $3,361.20 "
+                "Auction May 28, 2026"
+            ),
+            "value": "app.alt.xyz/browse/sold/d2ec8d24-6cc3-4af3-8d03-fe53d2eb7e4f",
+        },
+    ]
+
+    sales = capture_links_to_sales(links, search_query="Jalen Williams Prizm PSA 10")
+
+    assert sales[0].external_sale_id == "alt-sold-d2ec8d24-6cc3-4af3-8d03-fe53d2eb7e4f"
+
+
+def test_capture_links_to_sales_uses_goldin_item_url_as_sale_id():
+    links = [
+        {
+            "description": (
+                "GOLDIN 2023-24 Panini Prizm Pink Fast Break #150 Amen Thompson "
+                "Rookie Card (#07/50) - PSA GEM MT 10 Price $471.00 Auction May 29, 2026"
+            ),
+            "value": "goldin.co/item/2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4",
+        },
+    ]
+
+    sales = capture_links_to_sales(links, search_query="Amen Thompson Prizm PSA 10")
+
+    assert (
+        sales[0].external_sale_id
+        == "goldin-item-2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4"
+    )
