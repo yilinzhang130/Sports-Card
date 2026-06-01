@@ -23,6 +23,47 @@ def test_table_missing_is_raised_when_table_absent():
             queries.repeat_sales_index(engine=fake_engine)
 
 
+def test_data_health_summary_counts_real_rows(migrated_db):
+    from datetime import datetime
+    from decimal import Decimal
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from sportscards.db.models import TxClean, TxRaw
+
+    engine = create_engine(migrated_db)
+    with Session(engine) as session:
+        raw = TxRaw(
+            source="cardladder_manual",
+            raw_title="2023 Panini Prizm Victor Wembanyama #136 PSA 10",
+            raw_price=Decimal("500.00"),
+            sold_at=datetime(2026, 6, 1, tzinfo=UTC),
+            external_id="clm-test",
+        )
+        session.add(raw)
+        session.flush()
+        session.add(
+            TxClean(
+                raw_id=raw.raw_id,
+                price_usd=Decimal("500.00"),
+                sold_at=datetime(2026, 6, 1, tzinfo=UTC),
+                parser_confidence=Decimal("0.900"),
+                parser_method="test",
+            )
+        )
+        session.commit()
+
+    summary = queries.data_health_summary(engine=engine)
+
+    assert summary == {
+        "raw_transactions": 1,
+        "clean_transactions": 1,
+        "cardladder_rows": 1,
+        "parse_failures": 0,
+    }
+
+
 # --- Renderer tests ----------------------------------------------------------
 
 

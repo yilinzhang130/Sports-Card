@@ -294,6 +294,25 @@ def data_health(engine: Engine | None = None) -> dict[str, pd.DataFrame]:
     return {"raw_vs_clean": raw_vs_clean, "failures": failures}
 
 
+def data_health_summary(engine: Engine | None = None) -> dict[str, int]:
+    eng = _engine(engine)
+    _require(eng, "tx_raw", "Phase 1")
+    _require(eng, "tx_clean", "Phase 1")
+    _require(eng, "parse_failures", "Phase 1")
+    row = pd.read_sql(
+        text(
+            "SELECT "
+            "  (SELECT COUNT(*) FROM tx_raw) AS raw_transactions, "
+            "  (SELECT COUNT(*) FROM tx_clean) AS clean_transactions, "
+            "  (SELECT COUNT(*) FROM tx_raw "
+            "   WHERE source = 'cardladder_manual') AS cardladder_rows, "
+            "  (SELECT COUNT(*) FROM parse_failures) AS parse_failures"
+        ),
+        eng,
+    ).iloc[0]
+    return {key: int(row[key]) for key in row.index}
+
+
 # --- Grading EV leaderboard (grading-ev) --------------------------------------
 
 

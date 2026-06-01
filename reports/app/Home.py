@@ -21,10 +21,16 @@ st.caption("Localhost-only operator UI. The `sportscards` CLI remains canonical.
 
 st.markdown("### Data health")
 try:
-    health = queries.data_health()
-    cols = st.columns(max(1, len(health)))
-    for col, (name, df) in zip(cols, health.items(), strict=False):
-        col.metric(name, len(df))
+    summary = queries.data_health_summary()
+    cols = st.columns(max(1, len(summary)))
+    labels = {
+        "raw_transactions": "raw transactions",
+        "clean_transactions": "clean transactions",
+        "cardladder_rows": "Card Ladder rows",
+        "parse_failures": "parse failures",
+    }
+    for col, (name, value) in zip(cols, summary.items(), strict=False):
+        col.metric(labels.get(name, name), value)
 except queries.TableMissing as e:
     st.info(f"Data health unavailable yet — {e.phase} migration needed.")
 except Exception as e:  # pragma: no cover — defensive

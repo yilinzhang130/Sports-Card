@@ -45,6 +45,7 @@ PRICE_RE = re.compile(r"\bPrice\s+\$([0-9][0-9,]*(?:\.[0-9]{2})?)\b", re.I)
 DATE_RE = re.compile(r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\b")
 VERIFIED_RE = re.compile(r"\bverified\b", re.I)
 WHITESPACE_RE = re.compile(r"\s+")
+TITLE_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}(?:-\d{2})?\b")
 
 
 @dataclass(frozen=True)
@@ -145,10 +146,22 @@ def _strip_leading_sale_words(title: str) -> str:
     return cleaned
 
 
+def _strip_seller_prefix(title: str, platform: str) -> str:
+    cleaned = title.strip()
+    if platform != "EBAY" or not cleaned.startswith("-"):
+        return cleaned
+
+    year_match = TITLE_YEAR_RE.search(cleaned)
+    if year_match is None:
+        return cleaned.lstrip("- ").strip()
+    return cleaned[year_match.start() :].strip()
+
+
 def _extract_title(row_text: str, platform: str, price_start: int) -> str:
     title = row_text[:price_start].strip()
     if title.upper().startswith(platform):
         title = title[len(platform) :].strip()
+    title = _strip_seller_prefix(title, platform)
     return _strip_leading_sale_words(title)
 
 

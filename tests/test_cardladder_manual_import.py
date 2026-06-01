@@ -101,6 +101,16 @@ def test_parse_cardladder_text_skips_unparseable_chunks():
     assert rows[0].platform == "EBAY"
 
 
+def test_parse_cardladder_text_strips_ebay_seller_prefix():
+    rows = parse_cardladder_text(
+        "EBAY - PERFECT EDGES 2019 Donruss Optic Luka Doncic #16 FANATICS Prizm - "
+        "PSA 10 Price $102.97 Best Offer Jun 1, 2026"
+    )
+
+    assert len(rows) == 1
+    assert rows[0].raw_title == "2019 Donruss Optic Luka Doncic #16 FANATICS Prizm - PSA 10"
+
+
 def test_quick_sale_builds_same_shape():
     sale = build_quick_sale(
         platform="ebay",
