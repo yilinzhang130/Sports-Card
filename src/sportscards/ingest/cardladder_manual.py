@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -24,6 +24,7 @@ from sportscards.parse.router import parse_title
 SOURCE = "cardladder_manual"
 
 PLATFORMS = (
+    "PRISTINE AUCTION",
     "FANATICS WEEKLY",
     "FANATICS",
     "CARD HOBBY",
@@ -44,6 +45,7 @@ LISTING_TYPES = (
 PRICE_RE = re.compile(r"\bPrice\s+\$([0-9][0-9,]*(?:\.[0-9]{2})?)\b", re.I)
 DATE_RE = re.compile(r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\b")
 VERIFIED_RE = re.compile(r"\bverified\b", re.I)
+CONFIRMED_PAID_RE = re.compile(r"^\(?CONFIRMED PAID\)?\s+", re.I)
 WHITESPACE_RE = re.compile(r"\s+")
 TITLE_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}(?:-\d{2})?\b")
 
@@ -58,6 +60,8 @@ class CardLadderSale:
     verified: bool
     raw_text: str
     warnings: tuple[str, ...] = ()
+    search_query: str | None = None
+    external_sale_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -69,7 +73,21 @@ class CardLadderSale:
             "verified": self.verified,
             "raw_text": self.raw_text,
             "warnings": list(self.warnings),
+            "search_query": self.search_query,
+            "external_sale_id": self.external_sale_id,
         }
+
+    def with_metadata(
+        self,
+        *,
+        search_query: str | None = None,
+        external_sale_id: str | None = None,
+    ) -> CardLadderSale:
+        clean_query = search_query.strip() if search_query and search_query.strip() else None
+        clean_sale_id = (
+            external_sale_id.strip() if external_sale_id and external_sale_id.strip() else None
+        )
+        return replace(self, search_query=clean_query, external_sale_id=clean_sale_id)
 
     @classmethod
     def from_dict(cls, row: dict[str, Any]) -> CardLadderSale:
@@ -89,6 +107,8 @@ class CardLadderSale:
             verified=bool(row.get("verified", False)),
             raw_text=str(row["raw_text"]),
             warnings=tuple(str(w) for w in row.get("warnings", ())),
+            search_query=str(row["search_query"]) if row.get("search_query") else None,
+            external_sale_id=str(row["external_sale_id"]) if row.get("external_sale_id") else None,
         )
 
 
@@ -157,10 +177,15 @@ def _strip_seller_prefix(title: str, platform: str) -> str:
     return cleaned[year_match.start() :].strip()
 
 
+def _strip_status_prefix(title: str) -> str:
+    return CONFIRMED_PAID_RE.sub("", title.strip()).strip()
+
+
 def _extract_title(row_text: str, platform: str, price_start: int) -> str:
     title = row_text[:price_start].strip()
     if title.upper().startswith(platform):
         title = title[len(platform) :].strip()
+    title = _strip_status_prefix(title)
     title = _strip_seller_prefix(title, platform)
     return _strip_leading_sale_words(title)
 
@@ -181,6 +206,7 @@ def _parse_row(row_text: str) -> CardLadderSale | None:
     sold_at = datetime.strptime(date_match.group(0), "%b %d, %Y").replace(tzinfo=UTC)
     listing_type = _extract_listing_type(normalized, price_match.end(), date_match.start())
     raw_title = _extract_title(normalized, platform, price_match.start())
+    confirmed_paid = "(CONFIRMED PAID)" in normalized.upper() or "CONFIRMED PAID" in normalized.upper()
     warnings: list[str] = []
     if not raw_title:
         warnings.append("missing_title")
@@ -193,7 +219,7 @@ def _parse_row(row_text: str) -> CardLadderSale | None:
         price_usd=price,
         sold_at=sold_at,
         listing_type=listing_type,
-        verified=bool(VERIFIED_RE.search(normalized)),
+        verified=bool(VERIFIED_RE.search(normalized) or confirmed_paid),
         raw_text=normalized,
         warnings=tuple(warnings),
     )
@@ -284,6 +310,8 @@ def build_quick_sale(
 
 
 def stable_external_id(sale: CardLadderSale) -> str:
+    if sale.external_sale_id:
+        return sale.external_sale_id
     payload = "|".join(
         [
             sale.platform.upper(),
@@ -334,6 +362,8 @@ def import_cardladder_sales(
                     "verified": sale.verified,
                     "raw_text": sale.raw_text,
                     "warnings": list(sale.warnings),
+                    "search_query": sale.search_query,
+                    "external_sale_id": sale.external_sale_id,
                 },
             )
             s.add(raw)

@@ -64,6 +64,65 @@ def test_data_health_summary_counts_real_rows(migrated_db):
     }
 
 
+def test_cardladder_coverage_summary_counts_rows_by_query(migrated_db):
+    from datetime import datetime
+    from decimal import Decimal
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from sportscards.db.models import TxRaw
+
+    engine = create_engine(migrated_db)
+    with Session(engine) as session:
+        session.add_all(
+            [
+                TxRaw(
+                    source="cardladder_manual",
+                    raw_title="Stephen Curry Prizm PSA 10",
+                    raw_price=Decimal("100.00"),
+                    sold_at=datetime(2026, 6, 1, tzinfo=UTC),
+                    external_id="clm-q1",
+                    raw_json={"search_query": "Stephen Curry Prizm PSA 10"},
+                ),
+                TxRaw(
+                    source="cardladder_manual",
+                    raw_title="Stephen Curry Prizm PSA 10",
+                    raw_price=Decimal("101.00"),
+                    sold_at=datetime(2026, 6, 1, tzinfo=UTC),
+                    external_id="clm-q2",
+                    raw_json={"search_query": "Stephen Curry Prizm PSA 10"},
+                ),
+                TxRaw(
+                    source="cardladder_manual",
+                    raw_title="Giannis Antetokounmpo Prizm PSA 10",
+                    raw_price=Decimal("90.00"),
+                    sold_at=datetime(2026, 6, 1, tzinfo=UTC),
+                    external_id="clm-q3",
+                    raw_json={"search_query": "Giannis Antetokounmpo Prizm PSA 10"},
+                ),
+                TxRaw(
+                    source="ebay",
+                    raw_title="Stephen Curry Prizm PSA 10",
+                    raw_price=Decimal("102.00"),
+                    sold_at=datetime(2026, 6, 1, tzinfo=UTC),
+                    external_id="ebay-q4",
+                    raw_json={"search_query": "Stephen Curry Prizm PSA 10"},
+                ),
+            ]
+        )
+        session.commit()
+
+    rows = queries.cardladder_coverage_summary(engine=engine)
+
+    assert list(rows["search_query"]) == [
+        "Stephen Curry Prizm PSA 10",
+        "Giannis Antetokounmpo Prizm PSA 10",
+    ]
+    assert int(rows.loc[rows.search_query == "Stephen Curry Prizm PSA 10", "rows"].iloc[0]) == 2
+    assert "latest_ingested_at" in rows.columns
+
+
 # --- Renderer tests ----------------------------------------------------------
 
 

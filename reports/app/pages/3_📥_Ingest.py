@@ -59,10 +59,17 @@ with st.expander("Auction-house CSV import"):
 
 # --- Card Ladder manual import ----------------------------------------------
 with st.expander("Card Ladder paste import"):
+    search_query = st.text_input(
+        "Search query",
+        key="cardladder_search_query",
+        placeholder="Example: Luka Doncic Prizm PSA 10",
+    )
     pasted = st.text_area("Paste Card Ladder Sales History rows", height=220)
     if st.button("Parse Preview", disabled=not pasted.strip(), key="cardladder_parse_preview"):
         sales = parse_cardladder_text(pasted)
-        st.session_state["cardladder_preview"] = [sale.to_dict() for sale in sales]
+        st.session_state["cardladder_preview"] = [
+            sale.with_metadata(search_query=search_query).to_dict() for sale in sales
+        ]
 
     preview = st.session_state.get("cardladder_preview", [])
     if preview:
@@ -72,8 +79,8 @@ with st.expander("Card Ladder paste import"):
             run_id = submit_job(
                 "cardladder_manual_import",
                 actions.cardladder_manual_import,
-                params={"rows": len(preview)},
-                kwargs={"rows": preview},
+                params={"rows": len(preview), "search_query": search_query},
+                kwargs={"rows": preview, "search_query": search_query},
             )
             st.session_state["job_cardladder"] = run_id
             st.rerun()
@@ -120,7 +127,7 @@ with st.expander("Quick sale entry"):
                 "cardladder_quick_sale",
                 actions.cardladder_manual_import,
                 params={"rows": 1},
-                kwargs={"rows": [sale.to_dict()]},
+                kwargs={"rows": [sale.to_dict()], "search_query": title},
             )
             st.session_state["job_cardladder_quick"] = run_id
             st.rerun()

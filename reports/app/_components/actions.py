@@ -166,11 +166,21 @@ def auction_import(*, path: str, house: str) -> dict[str, Any]:
     return {"raw_added": added}
 
 
-def cardladder_manual_import(*, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def cardladder_manual_import(
+    *,
+    rows: list[dict[str, Any]],
+    search_query: str | None = None,
+) -> dict[str, Any]:
     """Import manually pasted Card Ladder Sales History rows."""
     from sportscards.ingest.cardladder_manual import CardLadderSale, import_cardladder_sales
 
-    sales = [CardLadderSale.from_dict(row) for row in rows]
+    sales = [
+        CardLadderSale.from_dict(row).with_metadata(
+            search_query=search_query or row.get("search_query"),
+            external_sale_id=row.get("external_sale_id"),
+        )
+        for row in rows
+    ]
     result = import_cardladder_sales(sales)
     return {
         "inserted_raw": result.inserted_raw,
