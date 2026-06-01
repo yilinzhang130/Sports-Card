@@ -74,6 +74,16 @@ Card Ladder import is manual-only. It does not scrape Card Ladder, use browser
 cookies, or call private APIs. The operator copies visible Sales History rows,
 previews parsed fields locally, then imports confirmed rows.
 
+#### Agent-operated Card Ladder loop
+
+1. Open Card Ladder Sales History in Chrome.
+2. Run the next query from localhost coverage or the Card Ladder search queue.
+3. Read visible sale link descriptions from the browser accessibility tree.
+4. Convert those link descriptions with `cardladder_capture.capture_links_to_sales(...)`.
+5. Import the resulting rows through `cardladder_manual_import(...)`, preserving `search_query` and `saleId`.
+6. Refresh Home and confirm Card Ladder row count and coverage increased.
+7. Move to the next queue item.
+
 All write flows spawn background jobs (see `model_run_log` for status).
 
 ### 🔧 Parse Triage
