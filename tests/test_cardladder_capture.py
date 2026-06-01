@@ -81,3 +81,20 @@ def test_capture_links_to_sales_uses_marketplace_url_as_sale_id_fallback():
         "ebay-358617094067",
         "fanatics-weekly-46455ace-5468-11f1-b830-0a58a9feac02",
     ]
+
+
+def test_capture_links_to_sales_uses_fanatics_buy_now_url_as_sale_id():
+    links = [
+        {
+            "description": (
+                "FANATICS BUY NOW 2008 Topps Chrome Refractor Kobe Bryant "
+                "w/ LeBron James #24 PSA 10 GEM MINT Price $11,750.00 "
+                "verified Best Offer May 31, 2026"
+            ),
+            "value": "fanaticscollect.com/buy-now/b08d83bd-d033-4a10-99b3-b171502b2b59",
+        },
+    ]
+
+    sales = capture_links_to_sales(links, search_query="LeBron James Topps Chrome PSA 10")
+
+    assert sales[0].external_sale_id == "fanatics-buy-now-b08d83bd-d033-4a10-99b3-b171502b2b59"

@@ -21,8 +21,11 @@ def _sale_id_from_url(value: str) -> str | None:
     path_parts = [part for part in parsed.path.split("/") if part]
     if host.endswith("ebay.com") and len(path_parts) >= 2 and path_parts[0] == "itm":
         return f"ebay-{path_parts[1]}"
-    if host.endswith("fanaticscollect.com") and len(path_parts) >= 2 and path_parts[0] == "weekly":
-        return f"fanatics-weekly-{path_parts[1]}"
+    if host.endswith("fanaticscollect.com") and len(path_parts) >= 2:
+        if path_parts[0] == "weekly":
+            return f"fanatics-weekly-{path_parts[1]}"
+        if path_parts[0] == "buy-now":
+            return f"fanatics-buy-now-{path_parts[1]}"
     return None
 
 
