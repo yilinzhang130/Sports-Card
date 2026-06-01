@@ -36,6 +36,16 @@ except queries.TableMissing as e:
 except Exception as e:  # pragma: no cover — defensive
     st.info(f"Data health unavailable: {e}")
 
+try:
+    coverage = queries.cardladder_coverage_summary()
+    if not coverage.empty:
+        st.markdown("### Card Ladder coverage")
+        st.dataframe(coverage, use_container_width=True, hide_index=True)
+except queries.TableMissing:
+    pass
+except Exception as e:  # pragma: no cover — defensive
+    st.info(f"Card Ladder coverage unavailable: {e}")
+
 st.markdown("---")
 st.markdown(
     "**Use the sidebar to navigate.** The CLI is the canonical operator surface — "

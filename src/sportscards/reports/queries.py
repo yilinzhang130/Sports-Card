@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import json
 from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 
@@ -311,6 +312,43 @@ def data_health_summary(engine: Engine | None = None) -> dict[str, int]:
         eng,
     ).iloc[0]
     return {key: int(row[key]) for key in row.index}
+
+
+def _raw_json_search_query(value: object) -> str:
+    if isinstance(value, dict):
+        return str(value.get("search_query") or "unknown")
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return "unknown"
+        if isinstance(parsed, dict):
+            return str(parsed.get("search_query") or "unknown")
+    return "unknown"
+
+
+def cardladder_coverage_summary(engine: Engine | None = None) -> pd.DataFrame:
+    eng = _engine(engine)
+    _require(eng, "tx_raw", "Phase 1")
+    raw = pd.read_sql(
+        text(
+            "SELECT raw_json, ingested_at "
+            "FROM tx_raw "
+            "WHERE source = 'cardladder_manual'"
+        ),
+        eng,
+    )
+    if raw.empty:
+        return pd.DataFrame(columns=["search_query", "rows", "latest_ingested_at"])
+
+    raw["search_query"] = raw["raw_json"].map(_raw_json_search_query)
+    out = (
+        raw.groupby("search_query", as_index=False)
+        .agg(rows=("search_query", "size"), latest_ingested_at=("ingested_at", "max"))
+        .sort_values(["rows", "search_query"], ascending=[False, True])
+        .reset_index(drop=True)
+    )
+    return out[["search_query", "rows", "latest_ingested_at"]]
 
 
 # --- Grading EV leaderboard (grading-ev) --------------------------------------
