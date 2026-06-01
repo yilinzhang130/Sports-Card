@@ -12,8 +12,18 @@ from sportscards.ingest.cardladder_manual import CardLadderSale, parse_cardladde
 
 
 def _sale_id_from_url(value: str) -> str | None:
-    sale_id = parse_qs(urlparse(value).query).get("saleId", [""])[0].strip()
-    return sale_id or None
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    sale_id = parse_qs(parsed.query).get("saleId", [""])[0].strip()
+    if sale_id:
+        return sale_id
+
+    host = parsed.netloc.lower()
+    path_parts = [part for part in parsed.path.split("/") if part]
+    if host.endswith("ebay.com") and len(path_parts) >= 2 and path_parts[0] == "itm":
+        return f"ebay-{path_parts[1]}"
+    if host.endswith("fanaticscollect.com") and len(path_parts) >= 2 and path_parts[0] == "weekly":
+        return f"fanatics-weekly-{path_parts[1]}"
+    return None
 
 
 def _visible_sale_links(links: list[dict[str, str]]) -> list[tuple[str, str | None]]:

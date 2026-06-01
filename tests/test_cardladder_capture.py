@@ -55,3 +55,29 @@ def test_capture_links_to_sales_attaches_query_and_sale_id():
     assert {sale.search_query for sale in sales} == {"Luka Doncic Prizm PSA 10"}
     assert sales[0].raw_title == "2018-19 Panini Prizm Luka Doncic #280 PSA 10"
     assert sales[1].platform == "PRISTINE AUCTION"
+
+
+def test_capture_links_to_sales_uses_marketplace_url_as_sale_id_fallback():
+    links = [
+        {
+            "description": (
+                "EBAY - PD TRADING CARDS Luka Doncic 2019 Panini Prizm #21 "
+                "Far Out Fast Break PSA 10 Price $49.99 Best Offer Jun 1, 2026"
+            ),
+            "value": "ebay.com/itm/358617094067",
+        },
+        {
+            "description": (
+                "FANATICS WEEKLY 2018 Panini Prizm Luka Doncic ROOKIE #280 "
+                "PSA 10 GEM MINT Price $156.00 verified Auction Jun 1, 2026"
+            ),
+            "value": "fanaticscollect.com/weekly/46455ace-5468-11f1-b830-0a58a9feac02",
+        },
+    ]
+
+    sales = capture_links_to_sales(links, search_query="Luka Doncic Prizm PSA 10")
+
+    assert [sale.external_sale_id for sale in sales] == [
+        "ebay-358617094067",
+        "fanatics-weekly-46455ace-5468-11f1-b830-0a58a9feac02",
+    ]
