@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -60,6 +60,8 @@ class CardLadderSale:
     verified: bool
     raw_text: str
     warnings: tuple[str, ...] = ()
+    search_query: str | None = None
+    external_sale_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -71,7 +73,21 @@ class CardLadderSale:
             "verified": self.verified,
             "raw_text": self.raw_text,
             "warnings": list(self.warnings),
+            "search_query": self.search_query,
+            "external_sale_id": self.external_sale_id,
         }
+
+    def with_metadata(
+        self,
+        *,
+        search_query: str | None = None,
+        external_sale_id: str | None = None,
+    ) -> CardLadderSale:
+        clean_query = search_query.strip() if search_query and search_query.strip() else None
+        clean_sale_id = (
+            external_sale_id.strip() if external_sale_id and external_sale_id.strip() else None
+        )
+        return replace(self, search_query=clean_query, external_sale_id=clean_sale_id)
 
     @classmethod
     def from_dict(cls, row: dict[str, Any]) -> CardLadderSale:
@@ -91,6 +107,8 @@ class CardLadderSale:
             verified=bool(row.get("verified", False)),
             raw_text=str(row["raw_text"]),
             warnings=tuple(str(w) for w in row.get("warnings", ())),
+            search_query=str(row["search_query"]) if row.get("search_query") else None,
+            external_sale_id=str(row["external_sale_id"]) if row.get("external_sale_id") else None,
         )
 
 
@@ -292,6 +310,8 @@ def build_quick_sale(
 
 
 def stable_external_id(sale: CardLadderSale) -> str:
+    if sale.external_sale_id:
+        return sale.external_sale_id
     payload = "|".join(
         [
             sale.platform.upper(),
@@ -342,6 +362,8 @@ def import_cardladder_sales(
                     "verified": sale.verified,
                     "raw_text": sale.raw_text,
                     "warnings": list(sale.warnings),
+                    "search_query": sale.search_query,
+                    "external_sale_id": sale.external_sale_id,
                 },
             )
             s.add(raw)

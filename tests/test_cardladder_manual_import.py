@@ -130,11 +130,15 @@ def test_quick_sale_builds_same_shape():
 
 def test_sale_dict_round_trip():
     sale = parse_cardladder_text(SAMPLES[2])[0]
+    sale = sale.with_metadata(
+        search_query="Luka Doncic Prizm PSA 10",
+        external_sale_id="ebay-123",
+    )
 
     restored = sale.from_dict(sale.to_dict())
 
     assert restored == sale
-    assert stable_external_id(restored) == stable_external_id(sale)
+    assert stable_external_id(restored) == "ebay-123"
 
 
 def test_import_cardladder_sales_dedupes_and_writes_clean_best_effort(migrated_db):
@@ -147,3 +151,26 @@ def test_import_cardladder_sales_dedupes_and_writes_clean_best_effort(migrated_d
     assert first.inserted_clean == 1
     assert second.inserted_raw == 0
     assert second.skipped_duplicates == 1
+
+
+def test_import_cardladder_sales_persists_search_query_and_sale_id(migrated_db):
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import Session
+
+    from sportscards.db.models import TxRaw
+
+    sale = parse_cardladder_text(SAMPLES[2])[0].with_metadata(
+        search_query="Luka Doncic Prizm PSA 10",
+        external_sale_id="ebay-123",
+    )
+
+    result = import_cardladder_sales([sale])
+
+    assert result.inserted_raw == 1
+    engine = create_engine(migrated_db)
+    with Session(engine) as session:
+        raw = session.execute(select(TxRaw)).scalar_one()
+
+    assert raw.external_id == "ebay-123"
+    assert raw.raw_json["search_query"] == "Luka Doncic Prizm PSA 10"
+    assert raw.raw_json["external_sale_id"] == "ebay-123"
