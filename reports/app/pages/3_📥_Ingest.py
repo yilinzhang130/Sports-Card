@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import os
 import tempfile
+from decimal import Decimal
 
+import pandas as pd
 import streamlit as st
 
 from reports.app._components import actions
 from reports.app._components.auth import guard_localhost
 from reports.app._components.jobs import get_status, submit_job
 from reports.app._components.ui import confirm_toggle, job_badge
+from sportscards.ingest.cardladder_manual import build_quick_sale, parse_cardladder_text
 
 st.set_page_config(page_title="Ingest", page_icon="📥", layout="wide")
 guard_localhost()
@@ -52,6 +55,76 @@ with st.expander("Auction-house CSV import"):
             st.session_state["job_auction"] = run_id
             st.rerun()
     _render_status("job_auction")
+
+
+# --- Card Ladder manual import ----------------------------------------------
+with st.expander("Card Ladder paste import"):
+    pasted = st.text_area("Paste Card Ladder Sales History rows", height=220)
+    if st.button("Parse Preview", disabled=not pasted.strip(), key="cardladder_parse_preview"):
+        sales = parse_cardladder_text(pasted)
+        st.session_state["cardladder_preview"] = [sale.to_dict() for sale in sales]
+
+    preview = st.session_state.get("cardladder_preview", [])
+    if preview:
+        st.dataframe(pd.DataFrame(preview), use_container_width=True)
+        ok = confirm_toggle("confirm_cardladder_import")
+        if st.button("Import confirmed rows", disabled=not ok, key="cardladder_import"):
+            run_id = submit_job(
+                "cardladder_manual_import",
+                actions.cardladder_manual_import,
+                params={"rows": len(preview)},
+                kwargs={"rows": preview},
+            )
+            st.session_state["job_cardladder"] = run_id
+            st.rerun()
+    elif pasted.strip():
+        st.info("Paste rows, then click Parse Preview.")
+    _render_status("job_cardladder")
+
+
+with st.expander("Quick sale entry"):
+    with st.form("form_cardladder_quick_sale"):
+        platform = st.selectbox(
+            "Platform",
+            [
+                "EBAY",
+                "FANATICS",
+                "FANATICS WEEKLY",
+                "GOLDIN",
+                "ALT",
+                "CARD HOBBY",
+                "HERITAGE",
+                "MY SLABS",
+            ],
+        )
+        title = st.text_input("Title")
+        price = st.number_input("Price USD", min_value=0.01, value=100.0, step=1.0)
+        sold_date = st.date_input("Sold date")
+        listing_type = st.selectbox(
+            "Listing type",
+            ["Auction", "Best Offer", "Buy Now", "Fixed Price"],
+        )
+        verified = st.checkbox("Verified")
+        ok = confirm_toggle("confirm_cardladder_quick")
+        submitted = st.form_submit_button("Import sale", disabled=not ok or not title.strip())
+        if submitted:
+            sale = build_quick_sale(
+                platform=platform,
+                raw_title=title,
+                price_usd=Decimal(str(price)),
+                sold_date=sold_date,
+                listing_type=listing_type,
+                verified=verified,
+            )
+            run_id = submit_job(
+                "cardladder_quick_sale",
+                actions.cardladder_manual_import,
+                params={"rows": 1},
+                kwargs={"rows": [sale.to_dict()]},
+            )
+            st.session_state["job_cardladder_quick"] = run_id
+            st.rerun()
+    _render_status("job_cardladder_quick")
 
 
 # --- eBay ingest -------------------------------------------------------------

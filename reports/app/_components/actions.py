@@ -166,6 +166,21 @@ def auction_import(*, path: str, house: str) -> dict[str, Any]:
     return {"raw_added": added}
 
 
+def cardladder_manual_import(*, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Import manually pasted Card Ladder Sales History rows."""
+    from sportscards.ingest.cardladder_manual import CardLadderSale, import_cardladder_sales
+
+    sales = [CardLadderSale.from_dict(row) for row in rows]
+    result = import_cardladder_sales(sales)
+    return {
+        "inserted_raw": result.inserted_raw,
+        "inserted_clean": result.inserted_clean,
+        "skipped_duplicates": result.skipped_duplicates,
+        "failed_clean": result.failed_clean,
+        "errors": list(result.errors),
+    }
+
+
 def ebay_ingest(*, keywords: str, max_pages: int) -> dict[str, Any]:
     """Mirror ``sportscards ingest ebay``."""
     from sportscards.ingest.ebay_browse import ingest_sold
