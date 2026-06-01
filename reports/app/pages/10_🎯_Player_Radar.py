@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import sys
+
 import pandas as pd
 import streamlit as st
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from reports.app._components.auth import guard_localhost
 from reports.app._components.ui import job_badge
