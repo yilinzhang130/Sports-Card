@@ -19,6 +19,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from sportscards.db.session import get_engine
+from sportscards.ingest.cardladder_queue import query_tiers
 
 
 class TableMissing(RuntimeError):
@@ -349,6 +350,180 @@ def cardladder_coverage_summary(engine: Engine | None = None) -> pd.DataFrame:
         .reset_index(drop=True)
     )
     return out[["search_query", "rows", "latest_ingested_at"]]
+
+
+def cardladder_player_radar(engine: Engine | None = None) -> pd.DataFrame:
+    """Rank Card Ladder search baskets for player-selection work.
+
+    This intentionally works from ``tx_raw`` plus the agent-operated queue,
+    so it is usable before card-master mapping is complete. The score is a
+    pragmatic operator ranking, not an investment model.
+    """
+    eng = _engine(engine)
+    _require(eng, "tx_raw", "Phase 1")
+    raw = pd.read_sql(
+        text(
+            "SELECT raw_json, raw_price, sold_at, ingested_at "
+            "FROM tx_raw "
+            "WHERE source = 'cardladder_manual'"
+        ),
+        eng,
+    )
+
+    queue = pd.DataFrame([row.__dict__ for row in query_tiers()])
+    if queue.empty:
+        return pd.DataFrame(
+            columns=[
+                "tier",
+                "search_query",
+                "target_rows",
+                "cadence",
+                "rows",
+                "coverage_pct",
+                "median_price",
+                "avg_price",
+                "high_sale",
+                "low_sale",
+                "price_volatility",
+                "premium_sale_pct",
+                "latest_sale_at",
+                "latest_ingested_at",
+                "radar_score",
+                "next_action",
+            ]
+        )
+    queue = queue.rename(columns={"query": "search_query"})
+
+    if raw.empty:
+        out = queue.copy()
+        out["rows"] = 0
+        out["coverage_pct"] = 0.0
+        for column in (
+            "median_price",
+            "avg_price",
+            "high_sale",
+            "low_sale",
+            "price_volatility",
+            "premium_sale_pct",
+            "radar_score",
+        ):
+            out[column] = 0.0
+        out["latest_sale_at"] = pd.NaT
+        out["latest_ingested_at"] = pd.NaT
+        out["next_action"] = "ingest_more"
+        return out[_player_radar_columns()].sort_values(["tier", "search_query"]).reset_index(
+            drop=True
+        )
+
+    raw["search_query"] = raw["raw_json"].map(_raw_json_search_query)
+    raw = raw[raw["search_query"] != "unknown"]
+    raw["raw_price"] = pd.to_numeric(raw["raw_price"], errors="coerce")
+    raw = raw.dropna(subset=["raw_price"])
+    if raw.empty:
+        return queue.assign(
+            rows=0,
+            coverage_pct=0.0,
+            median_price=0.0,
+            avg_price=0.0,
+            high_sale=0.0,
+            low_sale=0.0,
+            price_volatility=0.0,
+            premium_sale_pct=0.0,
+            latest_sale_at=pd.NaT,
+            latest_ingested_at=pd.NaT,
+            radar_score=0.0,
+            next_action="ingest_more",
+        )[_player_radar_columns()]
+
+    grouped = raw.groupby("search_query", as_index=False).agg(
+        rows=("search_query", "size"),
+        median_price=("raw_price", "median"),
+        avg_price=("raw_price", "mean"),
+        high_sale=("raw_price", "max"),
+        low_sale=("raw_price", "min"),
+        price_std=("raw_price", "std"),
+        latest_sale_at=("sold_at", "max"),
+        latest_ingested_at=("ingested_at", "max"),
+    )
+    premium_rates: list[dict[str, object]] = []
+    for search_query, sub in raw.groupby("search_query"):
+        median = float(sub["raw_price"].median())
+        threshold = median * 2 if median > 0 else float("inf")
+        premium_rates.append(
+            {
+                "search_query": search_query,
+                "premium_sale_pct": float((sub["raw_price"] >= threshold).mean()),
+            }
+        )
+    grouped = grouped.merge(pd.DataFrame(premium_rates), on="search_query", how="left")
+
+    out = queue.merge(grouped, on="search_query", how="outer")
+    out["tier"] = out["tier"].fillna("Z")
+    out["target_rows"] = pd.to_numeric(out["target_rows"], errors="coerce").fillna(50).astype(int)
+    out["cadence"] = out["cadence"].fillna("manual")
+    out["rows"] = pd.to_numeric(out["rows"], errors="coerce").fillna(0).astype(int)
+    for column in ("median_price", "avg_price", "high_sale", "low_sale", "price_std"):
+        out[column] = pd.to_numeric(out[column], errors="coerce").fillna(0.0)
+    out["premium_sale_pct"] = pd.to_numeric(out["premium_sale_pct"], errors="coerce").fillna(0.0)
+    out["coverage_pct"] = (out["rows"] / out["target_rows"].clip(lower=1) * 100).clip(upper=100)
+    out["price_volatility"] = (
+        out["price_std"] / out["median_price"].where(out["median_price"] > 0)
+    ).fillna(0.0)
+
+    max_median = float(out["median_price"].max()) or 1.0
+    price_score = out["median_price"].map(lambda value: _safe_log_ratio(float(value), max_median))
+    liquidity_score = out.apply(
+        lambda row: _safe_log_ratio(float(row["rows"]), float(row["target_rows"])),
+        axis=1,
+    )
+    volatility_score = (out["price_volatility"].clip(lower=0, upper=2) / 2).astype(float)
+    coverage_penalty = (out["coverage_pct"] / 100).astype(float)
+    out["radar_score"] = (
+        40 * price_score
+        + 25 * liquidity_score
+        + 20 * out["premium_sale_pct"]
+        + 15 * volatility_score
+        - 10 * coverage_penalty
+    ).round(2)
+    out["next_action"] = out.apply(
+        lambda row: "monitor" if int(row["rows"]) >= int(row["target_rows"]) else "ingest_more",
+        axis=1,
+    )
+
+    return (
+        out[_player_radar_columns()]
+        .sort_values(["radar_score", "rows", "search_query"], ascending=[False, False, True])
+        .reset_index(drop=True)
+    )
+
+
+def _safe_log_ratio(value: float, max_value: float) -> float:
+    import math
+
+    if value <= 0 or max_value <= 0:
+        return 0.0
+    return float(math.log1p(value) / math.log1p(max_value))
+
+
+def _player_radar_columns() -> list[str]:
+    return [
+        "tier",
+        "search_query",
+        "target_rows",
+        "cadence",
+        "rows",
+        "coverage_pct",
+        "median_price",
+        "avg_price",
+        "high_sale",
+        "low_sale",
+        "price_volatility",
+        "premium_sale_pct",
+        "latest_sale_at",
+        "latest_ingested_at",
+        "radar_score",
+        "next_action",
+    ]
 
 
 # --- Grading EV leaderboard (grading-ev) --------------------------------------
