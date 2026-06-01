@@ -61,11 +61,20 @@ terminal — that command warns on stderr for every override applied.
 
 - Auction-house CSV upload (Goldin / Heritage / Fanatics Collect) →
   `import_auction_csv(path, house)`
+- Card Ladder paste import → paste visible Sales History rows, preview parsed
+  fields, then import confirmed rows into `tx_raw` with
+  `source='cardladder_manual'`; best-effort parsed rows also enter `tx_clean`.
+- Quick sale entry → manually enter one Card Ladder comp when copying a full
+  Sales History row is not convenient.
 - eBay sold-listings ingest → `ingest_sold(...)` (button auto-disables when
   `EBAY_CLIENT_ID` is missing from `.env`)
 - PSA pop snapshot → `daily_psa_pop_flow()`
 
-All three spawn background jobs (see `model_run_log` for status).
+Card Ladder import is manual-only. It does not scrape Card Ladder, use browser
+cookies, or call private APIs. The operator copies visible Sales History rows,
+previews parsed fields locally, then imports confirmed rows.
+
+All write flows spawn background jobs (see `model_run_log` for status).
 
 ### 🔧 Parse Triage
 
