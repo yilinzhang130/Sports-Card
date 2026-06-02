@@ -418,7 +418,7 @@ def cardladder_player_radar(engine: Engine | None = None) -> pd.DataFrame:
     raw["raw_price"] = pd.to_numeric(raw["raw_price"], errors="coerce")
     raw = raw.dropna(subset=["raw_price"])
     if raw.empty:
-        return queue.assign(
+        out = queue.assign(
             rows=0,
             coverage_pct=0.0,
             median_price=0.0,
@@ -427,11 +427,12 @@ def cardladder_player_radar(engine: Engine | None = None) -> pd.DataFrame:
             low_sale=0.0,
             price_volatility=0.0,
             premium_sale_pct=0.0,
-            latest_sale_at=pd.NaT,
-            latest_ingested_at=pd.NaT,
             radar_score=0.0,
             next_action="ingest_more",
-        )[_player_radar_columns()]
+        )
+        out["latest_sale_at"] = pd.NaT
+        out["latest_ingested_at"] = pd.NaT
+        return out[_player_radar_columns()]
 
     grouped = raw.groupby("search_query", as_index=False).agg(
         rows=("search_query", "size"),
