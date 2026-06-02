@@ -115,6 +115,44 @@ class TxClean(Base):
     parser_method: Mapped[str] = mapped_column(String(16))
 
 
+class CardIdentityCandidate(Base):
+    __tablename__ = "card_identity_candidates"
+
+    raw_id: Mapped[int] = mapped_column(ForeignKey("tx_raw.raw_id"), primary_key=True)
+    canonical_key: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    player_name: Mapped[str | None] = mapped_column(String(128), index=True)
+    manufacturer: Mapped[str | None] = mapped_column(String(32))
+    year: Mapped[int | None] = mapped_column(Integer)
+    set_name: Mapped[str | None] = mapped_column("set", String(64))
+    subset: Mapped[str | None] = mapped_column(String(64))
+    card_number: Mapped[str | None] = mapped_column(String(32))
+    parallel: Mapped[str | None] = mapped_column(String(128))
+    print_run: Mapped[int | None] = mapped_column(Integer)
+    is_rookie: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_auto: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_patch: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    slab_grader: Mapped[str | None] = mapped_column(String(8))
+    slab_grade: Mapped[Decimal | None] = mapped_column(Numeric(4, 1))
+    confidence: Mapped[Decimal] = mapped_column(Numeric(4, 3), nullable=False)
+    needs_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_card_identity_candidates_key_grade",
+            "canonical_key",
+            "slab_grader",
+            "slab_grade",
+        ),
+    )
+
+
 class ParseFailure(Base):
     __tablename__ = "parse_failures"
 

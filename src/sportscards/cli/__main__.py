@@ -109,6 +109,24 @@ def auction() -> None:
     """Auction-house CSV import (Goldin/Heritage/Fanatics Collect)."""
 
 
+@cli.group()
+def identity() -> None:
+    """Card identity candidate tools."""
+
+
+@identity.command("materialize")
+@click.option("--source", default="cardladder_manual", show_default=True)
+@click.option("--limit", default=None, type=int)
+def identity_materialize_cmd(source: str, limit: int | None) -> None:
+    """Create card identity candidates from raw transactions."""
+    import json
+
+    from sportscards.identity.materialize import materialize_card_identity_candidates
+
+    summary = materialize_card_identity_candidates(source=source, limit=limit)
+    click.echo(json.dumps(summary, indent=2, default=str))
+
+
 @auction.command("import")
 @click.argument("path", type=click.Path(exists=True))
 @click.option(
