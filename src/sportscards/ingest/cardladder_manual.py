@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from sportscards.db.models import TxClean, TxRaw
 from sportscards.db.session import session_scope
@@ -329,6 +332,7 @@ def import_cardladder_sales(
     sales: Sequence[CardLadderSale],
     *,
     allow_clean: bool = True,
+    engine: Engine | None = None,
 ) -> ImportResult:
     inserted_raw = 0
     inserted_clean = 0
@@ -336,7 +340,8 @@ def import_cardladder_sales(
     failed_clean = 0
     errors: list[str] = []
 
-    with session_scope() as s:
+    context = session_scope() if engine is None else _session_scope_for_engine(engine)
+    with context as s:
         for sale in sales:
             external_id = stable_external_id(sale)
             existing = s.execute(
@@ -403,3 +408,14 @@ def import_cardladder_sales(
         failed_clean=failed_clean,
         errors=tuple(errors),
     )
+
+
+@contextmanager
+def _session_scope_for_engine(engine: Engine) -> Iterator[Session]:
+    with Session(engine) as session:
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise

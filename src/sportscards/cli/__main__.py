@@ -58,6 +58,39 @@ def ingest_ebay_cmd(keywords: str | None, pages: int) -> None:
 
 
 @cli.group()
+def cardladder() -> None:
+    """Card Ladder agent-operated capture helpers."""
+
+
+@cardladder.command("next")
+@click.option("--limit", default=10, type=int, show_default=True)
+def cardladder_next_cmd(limit: int) -> None:
+    """Print the next Card Ladder capture URLs as JSON."""
+    import json
+
+    from sportscards.ingest.cardladder_batch import next_capture_plan
+
+    click.echo(json.dumps(next_capture_plan(limit=limit), indent=2, default=str))
+
+
+@cardladder.command("import-links")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--query", required=True, help="Card Ladder Sales History search query.")
+def cardladder_import_links_cmd(path: str, query: str) -> None:
+    """Import browser-accessibility links captured from a Card Ladder page."""
+    import json
+    from pathlib import Path
+
+    from sportscards.ingest.cardladder_batch import captured_links_to_import_summary
+
+    payload = json.loads(Path(path).read_text())
+    if not isinstance(payload, list):
+        raise click.ClickException("links JSON must be a list of {description, value} objects")
+    summary = captured_links_to_import_summary(query, payload)
+    click.echo(json.dumps(summary, indent=2, default=str))
+
+
+@cli.group()
 def auction() -> None:
     """Auction-house CSV import (Goldin/Heritage/Fanatics Collect)."""
 
