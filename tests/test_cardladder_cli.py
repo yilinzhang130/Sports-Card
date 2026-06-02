@@ -50,3 +50,34 @@ def test_cardladder_import_links_cli_imports_json_file(migrated_db, monkeypatch,
     payload = json.loads(result.output)
     assert payload["captured"] == 1
     assert payload["inserted_raw"] == 1
+
+
+def test_cardladder_import_text_cli_imports_visible_body_text(migrated_db, monkeypatch, tmp_path):
+    monkeypatch.setenv("DATABASE_URL", migrated_db)
+    path = tmp_path / "body.txt"
+    path.write_text(
+        """
+        EBAY - INFINITY CARDS AND BEYOND
+        2023-24 Donruss Optic - Express Lane Ausar Thompson #18 Purple Prizm (RC) PSA 10
+        Price
+        $20.00
+        Best Offer
+        Jun 1, 2026
+        """,
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "cardladder",
+            "import-text",
+            "--query",
+            "Ausar Thompson Prizm PSA 10",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["captured"] == 1
+    assert payload["inserted_raw"] == 1

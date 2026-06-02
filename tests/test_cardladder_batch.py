@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sportscards.db.models import TxRaw
 from sportscards.ingest.cardladder_batch import (
     captured_links_to_import_summary,
+    captured_text_to_import_summary,
     next_capture_plan,
     search_url,
 )
@@ -79,6 +80,44 @@ def test_captured_links_to_import_summary_imports_visible_sales(migrated_db):
         "missing_external_ids": 0,
         "inserted_raw": 1,
         "inserted_clean": 1,
+        "skipped_duplicates": 0,
+        "failed_clean": 0,
+        "errors": [],
+    }
+
+
+def test_captured_text_to_import_summary_imports_visible_body_text(migrated_db):
+    engine = create_engine(migrated_db)
+    text = """
+    Date Sold
+    4,042 results
+    EBAY - INFINITY CARDS AND BEYOND
+    2023-24 Donruss Optic - Express Lane Ausar Thompson #18 Purple Prizm (RC) PSA 10
+    Price
+    $20.00
+    Best Offer
+    Jun 1, 2026
+    FANATICS WEEKLY
+    2023 Panini The National VIP Gold Prospect Red Sparkle Prizm Ausar Thompson /199 #AT PSA 10
+    Price
+    $26.40
+    Auction
+    Jun 1, 2026
+    NOTIFICATIONS
+    """
+
+    summary = captured_text_to_import_summary(
+        "Ausar Thompson Prizm PSA 10",
+        text,
+        engine=engine,
+    )
+
+    assert summary == {
+        "query": "Ausar Thompson Prizm PSA 10",
+        "captured": 2,
+        "missing_external_ids": 2,
+        "inserted_raw": 2,
+        "inserted_clean": 2,
         "skipped_duplicates": 0,
         "failed_clean": 0,
         "errors": [],

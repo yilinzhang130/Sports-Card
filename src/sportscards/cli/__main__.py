@@ -90,6 +90,20 @@ def cardladder_import_links_cmd(path: str, query: str) -> None:
     click.echo(json.dumps(summary, indent=2, default=str))
 
 
+@cardladder.command("import-text")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--query", required=True, help="Card Ladder Sales History search query.")
+def cardladder_import_text_cmd(path: str, query: str) -> None:
+    """Import visible body text captured from a Card Ladder Sales History page."""
+    import json
+    from pathlib import Path
+
+    from sportscards.ingest.cardladder_batch import captured_text_to_import_summary
+
+    summary = captured_text_to_import_summary(query, Path(path).read_text())
+    click.echo(json.dumps(summary, indent=2, default=str))
+
+
 @cli.group()
 def auction() -> None:
     """Auction-house CSV import (Goldin/Heritage/Fanatics Collect)."""

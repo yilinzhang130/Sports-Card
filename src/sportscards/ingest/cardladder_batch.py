@@ -8,7 +8,7 @@ from urllib.parse import quote
 from sqlalchemy.engine import Engine
 
 from sportscards.ingest.cardladder_capture import capture_links_to_sales
-from sportscards.ingest.cardladder_manual import import_cardladder_sales
+from sportscards.ingest.cardladder_manual import import_cardladder_sales, parse_cardladder_text
 from sportscards.ingest.cardladder_queue import next_searches
 from sportscards.reports import queries
 
@@ -52,6 +52,26 @@ def captured_links_to_import_summary(
     engine: Engine | None = None,
 ) -> dict[str, Any]:
     sales = capture_links_to_sales(links, search_query=query)
+    result = import_cardladder_sales(sales, engine=engine)
+    return {
+        "query": query,
+        "captured": len(sales),
+        "missing_external_ids": sum(1 for sale in sales if not sale.external_sale_id),
+        "inserted_raw": result.inserted_raw,
+        "inserted_clean": result.inserted_clean,
+        "skipped_duplicates": result.skipped_duplicates,
+        "failed_clean": result.failed_clean,
+        "errors": list(result.errors),
+    }
+
+
+def captured_text_to_import_summary(
+    query: str,
+    text: str,
+    *,
+    engine: Engine | None = None,
+) -> dict[str, Any]:
+    sales = [sale.with_metadata(search_query=query) for sale in parse_cardladder_text(text)]
     result = import_cardladder_sales(sales, engine=engine)
     return {
         "query": query,
