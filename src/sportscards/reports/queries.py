@@ -7,9 +7,9 @@ placeholder instead of crashing.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
-import json
 from datetime import UTC, datetime, timedelta
 from typing import TypeVar
 

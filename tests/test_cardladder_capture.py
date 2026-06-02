@@ -118,13 +118,17 @@ def test_capture_links_to_sales_uses_alt_sold_url_as_sale_id():
 
 
 def test_capture_links_to_sales_uses_goldin_item_url_as_sale_id():
+    goldin_url = (
+        "goldin.co/item/"
+        "2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4"
+    )
     links = [
         {
             "description": (
                 "GOLDIN 2023-24 Panini Prizm Pink Fast Break #150 Amen Thompson "
                 "Rookie Card (#07/50) - PSA GEM MT 10 Price $471.00 Auction May 29, 2026"
             ),
-            "value": "goldin.co/item/2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4",
+            "value": goldin_url,
         },
     ]
 

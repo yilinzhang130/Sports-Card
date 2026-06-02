@@ -206,7 +206,7 @@ def _parse_row(row_text: str) -> CardLadderSale | None:
     sold_at = datetime.strptime(date_match.group(0), "%b %d, %Y").replace(tzinfo=UTC)
     listing_type = _extract_listing_type(normalized, price_match.end(), date_match.start())
     raw_title = _extract_title(normalized, platform, price_match.start())
-    confirmed_paid = "(CONFIRMED PAID)" in normalized.upper() or "CONFIRMED PAID" in normalized.upper()
+    confirmed_paid = "CONFIRMED PAID" in normalized.upper()
     warnings: list[str] = []
     if not raw_title:
         warnings.append("missing_title")

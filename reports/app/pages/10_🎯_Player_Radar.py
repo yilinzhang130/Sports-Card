@@ -1,9 +1,11 @@
 """Player Radar — Card Ladder queue and player-selection surface."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
