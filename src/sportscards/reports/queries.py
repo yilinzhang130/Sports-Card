@@ -12,6 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TypeVar
+from urllib.parse import quote
 
 import pandas as pd
 from sqlalchemy import bindparam, inspect, text
@@ -446,6 +447,90 @@ def cardladder_coverage_summary(engine: Engine | None = None) -> pd.DataFrame:
         .reset_index(drop=True)
     )
     return out[["search_query", "rows", "latest_ingested_at"]]
+
+
+def collection_cockpit_targets(engine: Engine | None = None, *, limit: int = 50) -> pd.DataFrame:
+    """Operator view for deciding the next Card Ladder capture targets."""
+    eng = _engine(engine)
+    _require(eng, "tx_raw", "Phase 1")
+    _require(eng, "card_identity_candidates", "Card identity")
+
+    coverage = cardladder_coverage_summary(engine=eng)
+    coverage_by_query = (
+        coverage.set_index("search_query")["rows"].astype(int).to_dict()
+        if not coverage.empty
+        else {}
+    )
+    latest_by_query = (
+        coverage.set_index("search_query")["latest_ingested_at"].to_dict()
+        if not coverage.empty
+        else {}
+    )
+
+    search_expr = (
+        "json_extract(evidence_json, '$.search_query')"
+        if eng.dialect.name == "sqlite"
+        else "evidence_json ->> 'search_query'"
+    )
+    review_sql = text(
+        f"SELECT {search_expr} AS search_query, "
+        "       SUM(CASE WHEN needs_review THEN 1 ELSE 0 END) AS needs_review_rows "
+        "  FROM card_identity_candidates "
+        f" WHERE COALESCE({search_expr}, '') != '' "
+        f" GROUP BY {search_expr}"
+    )
+    review_df = pd.read_sql(review_sql, eng)
+    review_by_query = (
+        review_df.set_index("search_query")["needs_review_rows"].fillna(0).astype(int).to_dict()
+        if not review_df.empty
+        else {}
+    )
+
+    rows: list[dict[str, object]] = []
+    for target in query_tiers():
+        current_rows = int(coverage_by_query.get(target.query, 0))
+        remaining_rows = max(target.target_rows - current_rows, 0)
+        coverage_pct = 0.0 if target.target_rows == 0 else current_rows / target.target_rows * 100
+        needs_review_rows = int(review_by_query.get(target.query, 0))
+        if needs_review_rows:
+            next_action = "review_identity"
+        elif remaining_rows:
+            next_action = "ingest_more"
+        else:
+            next_action = "covered"
+        rows.append(
+            {
+                "tier": target.tier,
+                "search_query": target.query,
+                "cardladder_url": _cardladder_search_url(target.query),
+                "rows": current_rows,
+                "target_rows": target.target_rows,
+                "remaining_rows": remaining_rows,
+                "coverage_pct": coverage_pct,
+                "needs_review_rows": needs_review_rows,
+                "cadence": target.cadence,
+                "latest_ingested_at": latest_by_query.get(target.query),
+                "next_action": next_action,
+            }
+        )
+
+    out = pd.DataFrame(rows)
+    if out.empty:
+        return out
+    action_rank = {"review_identity": 0, "ingest_more": 1, "covered": 2}
+    tier_rank = {"A": 0, "B": 1, "C": 2, "D": 3}
+    out["_action_rank"] = out["next_action"].map(action_rank).fillna(9)
+    out["_tier_rank"] = out["tier"].map(tier_rank).fillna(9)
+    out = out.sort_values(
+        ["_action_rank", "_tier_rank", "coverage_pct", "rows", "search_query"],
+        ascending=[True, True, True, True, True],
+    ).head(limit)
+    return out.drop(columns=["_action_rank", "_tier_rank"]).reset_index(drop=True)
+
+
+def _cardladder_search_url(query: str) -> str:
+    encoded = quote(query, safe="")
+    return f"https://app.cardladder.com/sales-history?sort=date&direction=desc&q={encoded}"
 
 
 def cardladder_player_radar(engine: Engine | None = None) -> pd.DataFrame:
