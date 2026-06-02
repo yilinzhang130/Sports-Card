@@ -137,3 +137,25 @@ def test_capture_links_to_sales_uses_goldin_item_url_as_sale_id():
         sales[0].external_sale_id
         == "goldin-item-2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4"
     )
+
+
+def test_capture_links_to_sales_uses_pristine_auction_url_as_sale_id():
+    links = [
+        {
+            "description": (
+                "PRISTINE AUCTION Nikola Jokic 2022-23 Panini Prizm Prizms Red Ice "
+                "#236 RC (PSA 10) Price $43.00 Auction May 28, 2026"
+            ),
+            "value": (
+                "pristineauction.com/a11848818-Nikola-Jokic-2022-23-Panini-Prizm-"
+                "Prizms-Red-Ice-236-RC-PSA-10"
+            ),
+        },
+    ]
+
+    sales = capture_links_to_sales(links, search_query="Nikola Jokic Prizm PSA 10")
+
+    assert (
+        sales[0].external_sale_id == "pristineauction-a11848818-Nikola-Jokic-2022-23-Panini-Prizm-"
+        "Prizms-Red-Ice-236-RC-PSA-10"
+    )
