@@ -148,6 +148,87 @@ def player_price_history(player_id: int, engine: Engine | None = None) -> pd.Dat
     return pd.read_sql(sql, eng, params={"pid": player_id})
 
 
+# --- Card Identity Review -----------------------------------------------------
+
+
+def card_identity_review_summary(engine: Engine | None = None) -> dict[str, int]:
+    eng = _engine(engine)
+    _require(eng, "card_identity_candidates", "Card identity")
+    sql = text(
+        "SELECT COUNT(*) AS candidates, "
+        "       COUNT(DISTINCT canonical_key) AS distinct_identities, "
+        "       SUM(CASE WHEN needs_review THEN 1 ELSE 0 END) AS needs_review, "
+        "       SUM(CASE WHEN NOT needs_review THEN 1 ELSE 0 END) AS high_confidence "
+        "  FROM card_identity_candidates"
+    )
+    row = pd.read_sql(sql, eng).iloc[0].to_dict()
+    return {
+        "candidates": int(row.get("candidates") or 0),
+        "distinct_identities": int(row.get("distinct_identities") or 0),
+        "needs_review": int(row.get("needs_review") or 0),
+        "high_confidence": int(row.get("high_confidence") or 0),
+    }
+
+
+def card_identity_review_queue(
+    engine: Engine | None = None,
+    *,
+    needs_review: bool | None = None,
+    limit: int = 200,
+) -> pd.DataFrame:
+    eng = _engine(engine)
+    _require(eng, "card_identity_candidates", "Card identity")
+    search_expr = (
+        "json_extract(c.evidence_json, '$.search_query')"
+        if eng.dialect.name == "sqlite"
+        else "c.evidence_json ->> 'search_query'"
+    )
+    where = ""
+    params: dict[str, int | bool] = {"limit": limit}
+    if needs_review is not None:
+        where = "WHERE c.needs_review = :needs_review"
+        params["needs_review"] = needs_review
+    sql = text(
+        "SELECT c.raw_id, c.canonical_key, c.player_name, c.manufacturer, "
+        '       c.year, c."set" AS set_name, c.subset, c.card_number, c.parallel, '
+        "       c.print_run, c.is_rookie, c.has_auto, c.has_patch, "
+        "       c.slab_grader, c.slab_grade, c.confidence, c.needs_review, "
+        f"      {search_expr} AS search_query, "
+        "       r.raw_title, r.raw_price, r.sold_at "
+        "  FROM card_identity_candidates c "
+        "  JOIN tx_raw r ON r.raw_id = c.raw_id "
+        f" {where} "
+        " ORDER BY c.needs_review DESC, c.confidence ASC, c.raw_id DESC "
+        " LIMIT :limit"
+    )
+    df = pd.read_sql(sql, eng, params=params)
+    if "needs_review" in df.columns:
+        df["needs_review"] = df["needs_review"].map(bool).astype(object)
+    return df
+
+
+def card_identity_key_rollup(
+    engine: Engine | None = None,
+    *,
+    limit: int = 200,
+) -> pd.DataFrame:
+    eng = _engine(engine)
+    _require(eng, "card_identity_candidates", "Card identity")
+    sql = text(
+        'SELECT canonical_key, player_name, manufacturer, year, "set" AS set_name, '
+        "       subset, card_number, parallel, print_run, slab_grader, slab_grade, "
+        "       COUNT(*) AS rows, "
+        "       SUM(CASE WHEN needs_review THEN 1 ELSE 0 END) AS review_rows, "
+        "       MIN(confidence) AS min_confidence, MAX(confidence) AS max_confidence "
+        "  FROM card_identity_candidates "
+        ' GROUP BY canonical_key, player_name, manufacturer, year, "set", subset, '
+        "          card_number, parallel, print_run, slab_grader, slab_grade "
+        " ORDER BY rows DESC, canonical_key "
+        " LIMIT :limit"
+    )
+    return pd.read_sql(sql, eng, params={"limit": limit})
+
+
 # --- Portfolio (Phase 4) -------------------------------------------------------
 
 
