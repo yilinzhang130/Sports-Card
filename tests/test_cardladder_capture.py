@@ -119,8 +119,7 @@ def test_capture_links_to_sales_uses_alt_sold_url_as_sale_id():
 
 def test_capture_links_to_sales_uses_goldin_item_url_as_sale_id():
     goldin_url = (
-        "goldin.co/item/"
-        "2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4"
+        "goldin.co/item/2023-24-panini-prizm-pink-fast-break-150-amen-thompson-rookie-card-07if0n4"
     )
     links = [
         {

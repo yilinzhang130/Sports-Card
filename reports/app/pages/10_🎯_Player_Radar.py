@@ -73,9 +73,7 @@ action_filter = st.multiselect(
     sorted(radar["next_action"].dropna().unique().tolist()),
     default=sorted(radar["next_action"].dropna().unique().tolist()),
 )
-filtered = radar[
-    radar["tier"].isin(tier_filter) & radar["next_action"].isin(action_filter)
-].copy()
+filtered = radar[radar["tier"].isin(tier_filter) & radar["next_action"].isin(action_filter)].copy()
 
 display = filtered[
     [

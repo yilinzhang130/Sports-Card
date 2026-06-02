@@ -332,11 +332,7 @@ def cardladder_coverage_summary(engine: Engine | None = None) -> pd.DataFrame:
     eng = _engine(engine)
     _require(eng, "tx_raw", "Phase 1")
     raw = pd.read_sql(
-        text(
-            "SELECT raw_json, ingested_at "
-            "FROM tx_raw "
-            "WHERE source = 'cardladder_manual'"
-        ),
+        text("SELECT raw_json, ingested_at FROM tx_raw WHERE source = 'cardladder_manual'"),
         eng,
     )
     if raw.empty:
@@ -411,8 +407,10 @@ def cardladder_player_radar(engine: Engine | None = None) -> pd.DataFrame:
         out["latest_sale_at"] = pd.NaT
         out["latest_ingested_at"] = pd.NaT
         out["next_action"] = "ingest_more"
-        return out[_player_radar_columns()].sort_values(["tier", "search_query"]).reset_index(
-            drop=True
+        return (
+            out[_player_radar_columns()]
+            .sort_values(["tier", "search_query"])
+            .reset_index(drop=True)
         )
 
     raw["search_query"] = raw["raw_json"].map(_raw_json_search_query)
