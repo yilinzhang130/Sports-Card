@@ -154,11 +154,20 @@ def player_price_history(player_id: int, engine: Engine | None = None) -> pd.Dat
 def card_identity_review_summary(engine: Engine | None = None) -> dict[str, int]:
     eng = _engine(engine)
     _require(eng, "card_identity_candidates", "Card identity")
+    review_status_expr = (
+        "json_extract(evidence_json, '$.review_status')"
+        if eng.dialect.name == "sqlite"
+        else "evidence_json ->> 'review_status'"
+    )
     sql = text(
         "SELECT COUNT(*) AS candidates, "
         "       COUNT(DISTINCT canonical_key) AS distinct_identities, "
         "       SUM(CASE WHEN needs_review THEN 1 ELSE 0 END) AS needs_review, "
-        "       SUM(CASE WHEN NOT needs_review THEN 1 ELSE 0 END) AS high_confidence "
+        "       SUM(CASE WHEN NOT needs_review "
+        f"                 AND COALESCE({review_status_expr}, '') != 'rejected' "
+        "                THEN 1 ELSE 0 END) AS high_confidence, "
+        f"      SUM(CASE WHEN COALESCE({review_status_expr}, '') = 'rejected' "
+        "               THEN 1 ELSE 0 END) AS rejected "
         "  FROM card_identity_candidates"
     )
     row = pd.read_sql(sql, eng).iloc[0].to_dict()
@@ -167,6 +176,7 @@ def card_identity_review_summary(engine: Engine | None = None) -> dict[str, int]
         "distinct_identities": int(row.get("distinct_identities") or 0),
         "needs_review": int(row.get("needs_review") or 0),
         "high_confidence": int(row.get("high_confidence") or 0),
+        "rejected": int(row.get("rejected") or 0),
     }
 
 
@@ -174,6 +184,7 @@ def card_identity_review_queue(
     engine: Engine | None = None,
     *,
     needs_review: bool | None = None,
+    include_rejected: bool = False,
     limit: int = 200,
 ) -> pd.DataFrame:
     eng = _engine(engine)
@@ -183,11 +194,19 @@ def card_identity_review_queue(
         if eng.dialect.name == "sqlite"
         else "c.evidence_json ->> 'search_query'"
     )
-    where = ""
+    review_status_expr = (
+        "json_extract(c.evidence_json, '$.review_status')"
+        if eng.dialect.name == "sqlite"
+        else "c.evidence_json ->> 'review_status'"
+    )
+    filters: list[str] = []
     params: dict[str, int | bool] = {"limit": limit}
+    if not include_rejected:
+        filters.append(f"COALESCE({review_status_expr}, '') != 'rejected'")
     if needs_review is not None:
-        where = "WHERE c.needs_review = :needs_review"
+        filters.append("c.needs_review = :needs_review")
         params["needs_review"] = needs_review
+    where = "WHERE " + " AND ".join(filters) if filters else ""
     sql = text(
         "SELECT c.raw_id, c.canonical_key, c.player_name, c.manufacturer, "
         '       c.year, c."set" AS set_name, c.subset, c.card_number, c.parallel, '

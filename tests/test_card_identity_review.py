@@ -45,6 +45,7 @@ def test_card_identity_review_summary_counts_candidates(migrated_db):
         "distinct_identities": 1,
         "needs_review": 0,
         "high_confidence": 1,
+        "rejected": 0,
     }
 
 
